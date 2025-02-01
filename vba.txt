@@ -1,0 +1,63 @@
+' Required references: Selenium Type Library
+
+Sub ExportAndMoveFile()
+
+    Dim driver As New WebDriver
+    Dim user_id As String
+    Dim downloadFolder As String
+    Dim csvFilePath As String
+    Dim folderPath As String
+    Dim fileName As String
+    Dim fs As Object
+    Dim file As Object
+    Dim found As Boolean
+
+    ' Start the WebDriver session (make sure you have ChromeDriver or GeckoDriver in the path)
+    driver.Start "chrome", "https://yourwebsite.com"
+    driver.Get "https://yourwebsite.com"
+
+    ' Step 1: Find the element "(//div[@tabindex='0'])[last()]" and click it
+    driver.FindElementByXPath("(//div[@tabindex='0'])[last()]").Click
+
+    ' Step 2: Find the element "//div[@data-lol-id='vis_dropdown']" and click it
+    driver.FindElementByXPath("//div[@data-lol-id='vis_dropdown']").Click
+
+    ' Step 3: Find the element "//li[@data-lol-id='dashboard_export']" and click it
+    driver.FindElementByXPath("//li[@data-lol-id='dashboard_export']").Click
+
+    ' Step 4: Get Windows user login ID and enter it into the download path
+    user_id = Environ("USERNAME")
+    downloadFolder = "C:\Users\" & user_id & "\Downloads"
+
+    ' Step 5: Check for a CSV file containing the name partially "Mtd_Achievement, _Gap_"
+    found = False
+    Set fs = CreateObject("Scripting.FileSystemObject")
+    
+    ' Loop through files in the download folder
+    For Each file In fs.GetFolder(downloadFolder).Files
+        If InStr(file.Name, "Mtd_Achievement") > 0 And InStr(file.Name, "_Gap_") > 0 And fs.GetExtensionName(file.Name) = "csv" Then
+            fileName = file.Name
+            found = True
+            Exit For
+        End If
+    Next file
+
+    ' Step 6: Move the file if found
+    If found Then
+        ' Create the destination folder if it does not exist
+        folderPath = "C:\Users\" & user_id & "\Desktop\raw_data\curr_week"
+        If Not fs.FolderExists(folderPath) Then
+            fs.CreateFolder folderPath
+        End If
+
+        ' Move the file to the destination folder
+        fs.MoveFile downloadFolder & "\" & fileName, folderPath & "\" & fileName
+        MsgBox "File moved successfully: " & fileName
+    Else
+        MsgBox "No CSV file found matching the criteria."
+    End If
+
+    ' Close the browser session
+    driver.Quit
+
+End Sub
