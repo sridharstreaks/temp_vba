@@ -1,0 +1,14 @@
+create a VBA script that does "#exporting  file
+
+1. find the element "(//div[@tabindex="0"])[last()]" and
+click on it
+
+2. fin the element "//div[@data-lol-id="vis_dropdown"]" and click on it.
+
+3. find the element "//li[@data-lol-id="dashboard_export" ]" and click on it
+
+4. get windows user login id name and enter into this path "C:\Users \user_id\Downloads"
+
+5. check for a csv file containing a name partially "Mtd_Achievement, _Gap_"
+
+6. put that file in "C:\Users\user_id \Desktop\raw_data\curr_week" if no directory exists create one"
