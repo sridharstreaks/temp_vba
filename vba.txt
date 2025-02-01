@@ -1,8 +1,6 @@
-' Required references: Selenium Type Library
+Sub ExportAndMoveFile_IE()
 
-Sub ExportAndMoveFile()
-
-    Dim driver As New WebDriver
+    Dim ie As Object
     Dim user_id As String
     Dim downloadFolder As String
     Dim csvFilePath As String
@@ -12,24 +10,40 @@ Sub ExportAndMoveFile()
     Dim file As Object
     Dim found As Boolean
 
-    ' Start the WebDriver session (make sure you have ChromeDriver or GeckoDriver in the path)
-    driver.Start "chrome", "https://yourwebsite.com"
-    driver.Get "https://yourwebsite.com"
+    ' Step 1: Create a new instance of Internet Explorer
+    Set ie = CreateObject("InternetExplorer.Application")
+    
+    ' Make Internet Explorer visible
+    ie.Visible = True
 
-    ' Step 1: Find the element "(//div[@tabindex='0'])[last()]" and click it
-    driver.FindElementByXPath("(//div[@tabindex='0'])[last()]").Click
+    ' Step 2: Navigate to the webpage
+    ie.Navigate "https://yourwebsite.com" ' Replace with the correct URL
 
-    ' Step 2: Find the element "//div[@data-lol-id='vis_dropdown']" and click it
-    driver.FindElementByXPath("//div[@data-lol-id='vis_dropdown']").Click
+    ' Wait until the page is fully loaded
+    Do While ie.Busy Or ie.readyState <> 4
+        DoEvents
+    Loop
 
-    ' Step 3: Find the element "//li[@data-lol-id='dashboard_export']" and click it
-    driver.FindElementByXPath("//li[@data-lol-id='dashboard_export']").Click
+    ' Step 3: Find the element "(//div[@tabindex='0'])[last()]" and click on it
+    ie.document.querySelectorAll("div[tabindex='0']")(ie.document.querySelectorAll("div[tabindex='0']").length - 1).Click
 
-    ' Step 4: Get Windows user login ID and enter it into the download path
+    ' Wait for the page to respond after the click (optional)
+    Application.Wait (Now + TimeValue("0:00:2"))
+
+    ' Step 4: Find the element "//div[@data-lol-id='vis_dropdown']" and click on it
+    ie.document.querySelector("div[data-lol-id='vis_dropdown']").Click
+
+    ' Wait for the page to respond after the click (optional)
+    Application.Wait (Now + TimeValue("0:00:2"))
+
+    ' Step 5: Find the element "//li[@data-lol-id='dashboard_export']" and click on it
+    ie.document.querySelector("li[data-lol-id='dashboard_export']").Click
+
+    ' Step 6: Get Windows user login ID and enter it into the download path
     user_id = Environ("USERNAME")
     downloadFolder = "C:\Users\" & user_id & "\Downloads"
 
-    ' Step 5: Check for a CSV file containing the name partially "Mtd_Achievement, _Gap_"
+    ' Step 7: Check for a CSV file containing the name partially "Mtd_Achievement, _Gap_"
     found = False
     Set fs = CreateObject("Scripting.FileSystemObject")
     
@@ -42,7 +56,7 @@ Sub ExportAndMoveFile()
         End If
     Next file
 
-    ' Step 6: Move the file if found
+    ' Step 8: Move the file if found
     If found Then
         ' Create the destination folder if it does not exist
         folderPath = "C:\Users\" & user_id & "\Desktop\raw_data\curr_week"
@@ -57,7 +71,10 @@ Sub ExportAndMoveFile()
         MsgBox "No CSV file found matching the criteria."
     End If
 
-    ' Close the browser session
-    driver.Quit
+    ' Close Internet Explorer
+    ie.Quit
+
+    ' Clean up the IE object
+    Set ie = Nothing
 
 End Sub
