@@ -1,22 +1,73 @@
-Sub CreateFolders()
-    Dim basePath As String
+Sub SaveXLSXAttachmentsFromOutlookSearch()
+    Dim searchText As String
+    Dim newFolderPath As String
     Dim userName As String
-    Dim fullPath As String
+    Dim matchedCount As Long
     
-    ' Get the logged-in user's username
+    ' Get the logged-in user's username and set the folder path
     userName = Environ("USERNAME")
+    newFolderPath = "C:\Users\" & userName & "\Desktop\Raw_Data\Current_Data\"
     
-    ' Define the base path
-    basePath = "C:\Users\" & userName & "\Desktop\Raw_Data\Current_Data"
+    ' Ask user for the text to search in emails
+    searchText = InputBox("Enter the text to search for in Outlook emails:", "Search Emails")
     
-    ' Create the folder path if it doesn't exist
+    If Trim(searchText) = "" Then
+        MsgBox "No search text provided. Exiting.", vbExclamation
+        Exit Sub
+    End If
+    
+    ' Declare Outlook objects (late binding: no reference required)
+    Dim olApp As Object
+    Dim olNs As Object
+    Dim olFolder As Object
+    Dim olItems As Object
+    Dim mailItem As Object
+    Dim att As Object
+    Dim i As Long, j As Long
+    
     On Error Resume Next
-    If Dir(basePath, vbDirectory) = "" Then
-        MkDir "C:\Users\" & userName & "\Desktop\Raw_Data"
-        MkDir "C:\Users\" & userName & "\Desktop\Raw_Data\Current_Data"
-        MsgBox "Folders created successfully at: " & basePath, vbInformation
-    Else
-        MsgBox "The path already exists: " & basePath, vbExclamation
+    Set olApp = GetObject(, "Outlook.Application")
+    If olApp Is Nothing Then
+        Set olApp = CreateObject("Outlook.Application")
     End If
     On Error GoTo 0
+    
+    If olApp Is Nothing Then
+        MsgBox "Outlook is not available!", vbCritical
+        Exit Sub
+    End If
+    
+    Set olNs = olApp.GetNamespace("MAPI")
+    ' Use the default Inbox (folder index 6)
+    Set olFolder = olNs.GetDefaultFolder(6)
+    Set olItems = olFolder.Items
+    
+    matchedCount = 0
+    
+    ' Loop through the emails in the Inbox (reverse order recommended when deleting items; not needed here but it's a good practice)
+    For i = olItems.Count To 1 Step -1
+        Set mailItem = olItems.Item(i)
+        ' Make sure the item is a MailItem
+        If TypeName(mailItem) = "MailItem" Then
+            ' Check if search text is in the Subject or Body
+            If (InStr(1, mailItem.Subject, searchText, vbTextCompare) > 0) Or _
+               (InStr(1, mailItem.Body, searchText, vbTextCompare) > 0) Then
+               
+                ' Loop through attachments in the email
+                For j = 1 To mailItem.Attachments.Count
+                    Set att = mailItem.Attachments.Item(j)
+                    ' Check if the attachment file name ends with ".xlsx" (case-insensitive)
+                    If LCase(Right(att.FileName, 5)) = ".xlsx" Then
+                        Dim savePath As String
+                        savePath = newFolderPath & att.FileName
+                        ' Save the attachment to the folder
+                        att.SaveAsFile savePath
+                        matchedCount = matchedCount + 1
+                    End If
+                Next j
+            End If
+        End If
+    Next i
+    
+    MsgBox matchedCount & " attachment(s) saved to " & newFolderPath, vbInformation
 End Sub
