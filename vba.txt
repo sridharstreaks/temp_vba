@@ -1,80 +1,111 @@
-Sub ExportAndMoveFile_IE()
-
-    Dim ie As Object
-    Dim user_id As String
-    Dim downloadFolder As String
-    Dim csvFilePath As String
-    Dim folderPath As String
-    Dim fileName As String
-    Dim fs As Object
-    Dim file As Object
-    Dim found As Boolean
-
-    ' Step 1: Create a new instance of Internet Explorer
-    Set ie = CreateObject("InternetExplorer.Application")
+Sub AutomateChromeWorkflow()
+    Dim bot As New ChromeDriver
+    Dim ws As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim url As String
+    Dim pageTitle As String
+    Dim formElement As WebElement
+    Dim saveButton As WebElement
+    Dim savedConfirmation As WebElement
     
-    ' Make Internet Explorer visible
-    ie.Visible = True
-
-    ' Step 2: Navigate to the webpage
-    ie.Navigate "https://yourwebsite.com" ' Replace with the correct URL
-
-    ' Wait until the page is fully loaded
-    Do While ie.Busy Or ie.readyState <> 4
-        DoEvents
-    Loop
-
-    ' Step 3: Find the element "(//div[@tabindex='0'])[last()]" and click on it
-    ie.document.querySelectorAll("div[tabindex='0']")(ie.document.querySelectorAll("div[tabindex='0']").length - 1).Click
-
-    ' Wait for the page to respond after the click (optional)
-    Application.Wait (Now + TimeValue("0:00:2"))
-
-    ' Step 4: Find the element "//div[@data-lol-id='vis_dropdown']" and click on it
-    ie.document.querySelector("div[data-lol-id='vis_dropdown']").Click
-
-    ' Wait for the page to respond after the click (optional)
-    Application.Wait (Now + TimeValue("0:00:2"))
-
-    ' Step 5: Find the element "//li[@data-lol-id='dashboard_export']" and click on it
-    ie.document.querySelector("li[data-lol-id='dashboard_export']").Click
-
-    ' Step 6: Get Windows user login ID and enter it into the download path
-    user_id = Environ("USERNAME")
-    downloadFolder = "C:\Users\" & user_id & "\Downloads"
-
-    ' Step 7: Check for a CSV file containing the name partially "Mtd_Achievement, _Gap_"
-    found = False
-    Set fs = CreateObject("Scripting.FileSystemObject")
+    ' Define the expected titles (or other text on the page) for authenticated and non‐authenticated pages.
+    Const expectedTitleAuthenticated As String = "abcd"  ' e.g., correct page title or identifier
+    Const expectedTitleNotAuthenticated As String = "efgh"  ' e.g., page title indicating authentication is needed
     
-    ' Loop through files in the download folder
-    For Each file In fs.GetFolder(downloadFolder).Files
-        If InStr(file.Name, "Mtd_Achievement") > 0 And InStr(file.Name, "_Gap_") > 0 And fs.GetExtensionName(file.Name) = "csv" Then
-            fileName = file.Name
-            found = True
-            Exit For
+    ' Set reference to the worksheet containing URLs.
+    Set ws = ThisWorkbook.Sheets("Sheet1")
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    
+    ' Start Chrome. (You can add options if needed.)
+    bot.Start "chrome"
+    
+    ' Loop over each URL (assuming header in row 1).
+    For i = 2 To lastRow
+        url = ws.Cells(i, "A").Value
+        
+        ' Navigate to the URL.
+        bot.Get url
+        
+        ' Allow some time for the page to load. Adjust the wait time if necessary.
+        Application.Wait (Now + TimeValue("0:00:05"))
+        
+        ' Check the current page title or other element that distinguishes authenticated vs non‐authenticated pages.
+        pageTitle = bot.Title
+        
+        ' If the page is not yet authenticated, wait until it changes to the expected title.
+        If InStr(pageTitle, expectedTitleNotAuthenticated) > 0 Then
+            Debug.Print "Waiting for user authentication on URL: " & url
+            Do While InStr(bot.Title, expectedTitleAuthenticated) = 0
+                Application.Wait (Now + TimeValue("0:00:10"))
+                DoEvents
+            Loop
         End If
-    Next file
-
-    ' Step 8: Move the file if found
-    If found Then
-        ' Create the destination folder if it does not exist
-        folderPath = "C:\Users\" & user_id & "\Desktop\raw_data\curr_week"
-        If Not fs.FolderExists(folderPath) Then
-            fs.CreateFolder folderPath
+        
+        ' At this point, we assume the page is correct (authenticated).
+        Debug.Print "Authenticated page loaded: " & url
+        
+        ' Find the form element using its XPath.
+        ' (Replace the XPath with that of your target form element.)
+        On Error Resume Next
+        Set formElement = bot.FindElementByXPath("//input[@id='formField']")
+        On Error GoTo 0
+        If formElement Is Nothing Then
+            Debug.Print "Form element not found for URL: " & url
+            ws.Cells(i, "B").Value = "error: form not found"
+            GoTo NextUrl
         End If
-
-        ' Move the file to the destination folder
-        fs.MoveFile downloadFolder & "\" & fileName, folderPath & "\" & fileName
-        MsgBox "File moved successfully: " & fileName
-    Else
-        MsgBox "No CSV file found matching the criteria."
-    End If
-
-    ' Close Internet Explorer
-    ie.Quit
-
-    ' Clean up the IE object
-    Set ie = Nothing
-
+        
+        ' Clear any existing text and enter the predefined text.
+        formElement.Clear
+        formElement.SendKeys "Your predefined text here"
+        
+        ' Find and click the save button (adjust the XPath as needed).
+        On Error Resume Next
+        Set saveButton = bot.FindElementByXPath("//button[@id='saveButton']")
+        On Error GoTo 0
+        If saveButton Is Nothing Then
+            Debug.Print "Save button not found for URL: " & url
+            ws.Cells(i, "B").Value = "error: save button not found"
+            GoTo NextUrl
+        End If
+        saveButton.Click
+        
+        ' Wait until a “saved” confirmation appears (using an element that indicates the save was successful).
+        ' Adjust the XPath and wait time as needed.
+        Dim attempts As Integer
+        attempts = 0
+        Do
+            On Error Resume Next
+            Set savedConfirmation = bot.FindElementByXPath("//div[@id='savedMessage']")
+            On Error GoTo 0
+            If Not savedConfirmation Is Nothing Then Exit Do
+            
+            Application.Wait (Now + TimeValue("0:00:02"))
+            DoEvents
+            attempts = attempts + 1
+            If attempts > 15 Then Exit Do   ' Timeout after ~30 seconds
+        Loop
+        
+        If savedConfirmation Is Nothing Then
+            Debug.Print "Save confirmation not found for URL: " & url
+            ws.Cells(i, "B").Value = "error: no confirmation"
+        Else
+            ws.Cells(i, "B").Value = "done"
+            Debug.Print "URL processed: " & url
+        End If
+        
+NextUrl:
+        ' Optional: clear variables for next iteration.
+        Set formElement = Nothing
+        Set saveButton = Nothing
+        Set savedConfirmation = Nothing
+    Next i
+    
+    ' Quit the browser after processing all URLs.
+    bot.Quit
+    
+    ' Save the workbook.
+    ThisWorkbook.Save
+    
+    MsgBox "Automation complete!", vbInformation
 End Sub
