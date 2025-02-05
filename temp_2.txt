@@ -1,0 +1,22 @@
+Sub CreateFolders()
+    Dim basePath As String
+    Dim userName As String
+    Dim fullPath As String
+    
+    ' Get the logged-in user's username
+    userName = Environ("USERNAME")
+    
+    ' Define the base path
+    basePath = "C:\Users\" & userName & "\Desktop\Raw_Data\Current_Data"
+    
+    ' Create the folder path if it doesn't exist
+    On Error Resume Next
+    If Dir(basePath, vbDirectory) = "" Then
+        MkDir "C:\Users\" & userName & "\Desktop\Raw_Data"
+        MkDir "C:\Users\" & userName & "\Desktop\Raw_Data\Current_Data"
+        MsgBox "Folders created successfully at: " & basePath, vbInformation
+    Else
+        MsgBox "The path already exists: " & basePath, vbExclamation
+    End If
+    On Error GoTo 0
+End Sub
