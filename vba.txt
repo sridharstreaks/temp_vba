@@ -1,67 +1,44 @@
-Sub AutomateChromeWorkflowWithAuth()
-    Dim bot As New ChromeDriver
+Sub AutomateChromeWorkflow_AttachToRunningSession()
+    Dim options As New ChromeOptions
+    Dim bot As ChromeDriver
     Dim ws As Worksheet
     Dim lastRow As Long, i As Long
     Dim url As String
-    Dim pageSource As String
     Dim formElement As WebElement, saveButton As WebElement, savedConfirmation As WebElement
+    Dim handles As Variant, newTabHandle As String
     
-    ' --- STEP 1: Open authentication page and wait for login fields ---
-    Dim authUrl As String
-    authUrl = "http://example.com/auth"  ' Replace with your authentication page URL.
+    ' --- STEP 1: Attach to an already running Chrome instance ---
+    ' Make sure Chrome is started with the remote debugging port (e.g., 9222)
+    options.DebuggerAddress = "127.0.0.1:9222"
     
-    ' Set the worksheet (assumes URLs are in column A of Sheet1)
+    ' Create a new ChromeDriver instance using these options.
+    Set bot = New ChromeDriver
+    ' The following Start call attaches to the already running Chrome instance.
+    bot.Start "chrome", options
+    
+    ' --- STEP 2: Open a new tab in the attached session ---
+    bot.ExecuteScript "window.open('about:blank','_blank');"
+    handles = bot.WindowHandles
+    newTabHandle = handles(UBound(handles))
+    bot.SwitchToWindow newTabHandle
+    
+    ' --- STEP 3: Process URLs from Excel ---
+    ' Assume your Excel workbook has URLs in column A on "Sheet1" (row 1 header)
     Set ws = ThisWorkbook.Sheets("Sheet1")
     lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
     
-    ' Start Chrome and navigate to the authentication page.
-    bot.Start "chrome"
-    bot.Get authUrl
-    
-    ' Wait for the page to load by checking that both "username" and "password" are present.
-    Dim foundLoginFields As Boolean
-    foundLoginFields = False
-    Dim attempts As Integer: attempts = 0
-    Do While Not foundLoginFields And attempts < 30
-        pageSource = bot.PageSource
-        If (InStr(LCase(pageSource), "username") > 0) And (InStr(LCase(pageSource), "password") > 0) Then
-            foundLoginFields = True
-        Else
-            Application.Wait (Now + TimeValue("0:00:03"))
-            attempts = attempts + 1
-        End If
-    Loop
-    
-    If Not foundLoginFields Then
-        MsgBox "The authentication page did not load properly.", vbCritical
-        bot.Quit
-        Exit Sub
-    End If
-    
-    ' --- STEP 2: Wait for user to log in ---
-    ' After the user enters credentials, the page should change and include "welcome"
-    Debug.Print "Waiting for user to log in..."
-    Do
-        pageSource = bot.PageSource
-        If InStr(LCase(pageSource), "welcome") > 0 Then Exit Do
-        Application.Wait (Now + TimeValue("0:00:10"))
-        DoEvents
-    Loop
-    Debug.Print "User logged in successfully!"
-    
-    ' --- STEP 3: Process each URL in the same tab ---
-    For i = 2 To lastRow  ' Assuming row 1 is a header.
+    For i = 2 To lastRow
         url = ws.Cells(i, "A").Value
         Debug.Print "Processing URL: " & url
         
-        ' Navigate to the target URL in the same tab.
+        ' Navigate to the URL in the same tab.
         bot.Get url
         
-        ' Wait a few seconds for the page to load. Adjust as needed.
-        Application.Wait (Now + TimeValue("0:00:05"))
+        ' Wait for the page to load (adjust timing as needed).
+        Application.Wait Now + TimeValue("0:00:05")
         
-        ' Locate the form element using its XPath.
-        ' Adjust the XPath to target your specific form element.
+        ' --- STEP 4: Interact with the page ---
+        ' Locate the target form element via XPath.
         On Error Resume Next
         Set formElement = bot.FindElementByXPath("//input[@id='formField']")
         On Error GoTo 0
@@ -71,11 +48,11 @@ Sub AutomateChromeWorkflowWithAuth()
             GoTo NextUrl
         End If
         
-        ' Clear any existing text and enter the predefined text.
+        ' Clear existing text and enter the new text.
         formElement.Clear
         formElement.SendKeys "Your predefined text here"
         
-        ' Locate the save button using XPath.
+        ' Locate the save button (adjust the XPath as needed).
         On Error Resume Next
         Set saveButton = bot.FindElementByXPath("//button[@id='saveButton']")
         On Error GoTo 0
@@ -88,36 +65,40 @@ Sub AutomateChromeWorkflowWithAuth()
         ' Click the save button.
         saveButton.Click
         
-        ' Wait for a save confirmation element to appear.
-        Dim confirmAttempts As Integer: confirmAttempts = 0
+        ' Wait for a confirmation element that indicates the save was successful.
+        Dim attempts As Integer: attempts = 0
         Do
             On Error Resume Next
             Set savedConfirmation = bot.FindElementByXPath("//div[@id='savedMessage']")
             On Error GoTo 0
             If Not savedConfirmation Is Nothing Then Exit Do
             
-            Application.Wait (Now + TimeValue("0:00:02"))
-            confirmAttempts = confirmAttempts + 1
-            If confirmAttempts > 15 Then Exit Do  ' Timeout after ~30 seconds.
+            Application.Wait Now + TimeValue("0:00:02")
+            attempts = attempts + 1
+            If attempts > 15 Then Exit Do  ' Timeout after ~30 seconds.
         Loop
         
-        ' Record the result in Excel.
         If savedConfirmation Is Nothing Then
             ws.Cells(i, "B").Value = "error: confirmation not found"
-            Debug.Print "Save confirmation not found for URL: " & url
+            Debug.Print "Confirmation not found for URL: " & url
         Else
             ws.Cells(i, "B").Value = "done"
             Debug.Print "URL processed successfully: " & url
         End If
         
 NextUrl:
-        ' Clean up element variables for the next iteration.
+        ' Clean up element variables for next iteration.
         Set formElement = Nothing
         Set saveButton = Nothing
         Set savedConfirmation = Nothing
     Next i
     
-    ' --- STEP 4: Clean up and finish ---
+    ' --- STEP 5: Cleanup ---
+    ' Optionally, you can close the new tab if desired:
+    ' bot.CloseWindow
+    ' Switch back to the original window if needed.
+    
+    ' When finished, you may quit the driver (or leave Chrome running):
     bot.Quit
     ThisWorkbook.Save
     MsgBox "Automation complete!", vbInformation
