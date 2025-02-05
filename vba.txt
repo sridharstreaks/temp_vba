@@ -1,51 +1,67 @@
-Sub AutomateChromeWorkflow()
+Sub AutomateChromeWorkflowWithAuth()
     Dim bot As New ChromeDriver
     Dim ws As Worksheet
     Dim lastRow As Long, i As Long
     Dim url As String
-    Dim pageTitle As String
-    Dim formElement As WebElement
-    Dim saveButton As WebElement
-    Dim savedConfirmation As WebElement
+    Dim pageSource As String
+    Dim formElement As WebElement, saveButton As WebElement, savedConfirmation As WebElement
     
-    ' Define the expected titles (or other text on the page) for authenticated and non‐authenticated pages.
-    Const expectedTitleAuthenticated As String = "abcd"  ' e.g., correct page title or identifier
-    Const expectedTitleNotAuthenticated As String = "efgh"  ' e.g., page title indicating authentication is needed
+    ' --- STEP 1: Open authentication page and wait for login fields ---
+    Dim authUrl As String
+    authUrl = "http://example.com/auth"  ' Replace with your authentication page URL.
     
-    ' Set reference to the worksheet containing URLs.
+    ' Set the worksheet (assumes URLs are in column A of Sheet1)
     Set ws = ThisWorkbook.Sheets("Sheet1")
     lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
     
-    ' Start Chrome. (You can add options if needed.)
+    ' Start Chrome and navigate to the authentication page.
     bot.Start "chrome"
+    bot.Get authUrl
     
-    ' Loop over each URL (assuming header in row 1).
-    For i = 2 To lastRow
+    ' Wait for the page to load by checking that both "username" and "password" are present.
+    Dim foundLoginFields As Boolean
+    foundLoginFields = False
+    Dim attempts As Integer: attempts = 0
+    Do While Not foundLoginFields And attempts < 30
+        pageSource = bot.PageSource
+        If (InStr(LCase(pageSource), "username") > 0) And (InStr(LCase(pageSource), "password") > 0) Then
+            foundLoginFields = True
+        Else
+            Application.Wait (Now + TimeValue("0:00:03"))
+            attempts = attempts + 1
+        End If
+    Loop
+    
+    If Not foundLoginFields Then
+        MsgBox "The authentication page did not load properly.", vbCritical
+        bot.Quit
+        Exit Sub
+    End If
+    
+    ' --- STEP 2: Wait for user to log in ---
+    ' After the user enters credentials, the page should change and include "welcome"
+    Debug.Print "Waiting for user to log in..."
+    Do
+        pageSource = bot.PageSource
+        If InStr(LCase(pageSource), "welcome") > 0 Then Exit Do
+        Application.Wait (Now + TimeValue("0:00:10"))
+        DoEvents
+    Loop
+    Debug.Print "User logged in successfully!"
+    
+    ' --- STEP 3: Process each URL in the same tab ---
+    For i = 2 To lastRow  ' Assuming row 1 is a header.
         url = ws.Cells(i, "A").Value
+        Debug.Print "Processing URL: " & url
         
-        ' Navigate to the URL.
+        ' Navigate to the target URL in the same tab.
         bot.Get url
         
-        ' Allow some time for the page to load. Adjust the wait time if necessary.
+        ' Wait a few seconds for the page to load. Adjust as needed.
         Application.Wait (Now + TimeValue("0:00:05"))
         
-        ' Check the current page title or other element that distinguishes authenticated vs non‐authenticated pages.
-        pageTitle = bot.Title
-        
-        ' If the page is not yet authenticated, wait until it changes to the expected title.
-        If InStr(pageTitle, expectedTitleNotAuthenticated) > 0 Then
-            Debug.Print "Waiting for user authentication on URL: " & url
-            Do While InStr(bot.Title, expectedTitleAuthenticated) = 0
-                Application.Wait (Now + TimeValue("0:00:10"))
-                DoEvents
-            Loop
-        End If
-        
-        ' At this point, we assume the page is correct (authenticated).
-        Debug.Print "Authenticated page loaded: " & url
-        
-        ' Find the form element using its XPath.
-        ' (Replace the XPath with that of your target form element.)
+        ' Locate the form element using its XPath.
+        ' Adjust the XPath to target your specific form element.
         On Error Resume Next
         Set formElement = bot.FindElementByXPath("//input[@id='formField']")
         On Error GoTo 0
@@ -59,7 +75,7 @@ Sub AutomateChromeWorkflow()
         formElement.Clear
         formElement.SendKeys "Your predefined text here"
         
-        ' Find and click the save button (adjust the XPath as needed).
+        ' Locate the save button using XPath.
         On Error Resume Next
         Set saveButton = bot.FindElementByXPath("//button[@id='saveButton']")
         On Error GoTo 0
@@ -68,12 +84,12 @@ Sub AutomateChromeWorkflow()
             ws.Cells(i, "B").Value = "error: save button not found"
             GoTo NextUrl
         End If
+        
+        ' Click the save button.
         saveButton.Click
         
-        ' Wait until a “saved” confirmation appears (using an element that indicates the save was successful).
-        ' Adjust the XPath and wait time as needed.
-        Dim attempts As Integer
-        attempts = 0
+        ' Wait for a save confirmation element to appear.
+        Dim confirmAttempts As Integer: confirmAttempts = 0
         Do
             On Error Resume Next
             Set savedConfirmation = bot.FindElementByXPath("//div[@id='savedMessage']")
@@ -81,31 +97,28 @@ Sub AutomateChromeWorkflow()
             If Not savedConfirmation Is Nothing Then Exit Do
             
             Application.Wait (Now + TimeValue("0:00:02"))
-            DoEvents
-            attempts = attempts + 1
-            If attempts > 15 Then Exit Do   ' Timeout after ~30 seconds
+            confirmAttempts = confirmAttempts + 1
+            If confirmAttempts > 15 Then Exit Do  ' Timeout after ~30 seconds.
         Loop
         
+        ' Record the result in Excel.
         If savedConfirmation Is Nothing Then
+            ws.Cells(i, "B").Value = "error: confirmation not found"
             Debug.Print "Save confirmation not found for URL: " & url
-            ws.Cells(i, "B").Value = "error: no confirmation"
         Else
             ws.Cells(i, "B").Value = "done"
-            Debug.Print "URL processed: " & url
+            Debug.Print "URL processed successfully: " & url
         End If
         
 NextUrl:
-        ' Optional: clear variables for next iteration.
+        ' Clean up element variables for the next iteration.
         Set formElement = Nothing
         Set saveButton = Nothing
         Set savedConfirmation = Nothing
     Next i
     
-    ' Quit the browser after processing all URLs.
+    ' --- STEP 4: Clean up and finish ---
     bot.Quit
-    
-    ' Save the workbook.
     ThisWorkbook.Save
-    
     MsgBox "Automation complete!", vbInformation
 End Sub
