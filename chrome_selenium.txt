@@ -1,0 +1,9 @@
+Dim bot As New ChromeDriver
+
+' Add the additional capability for remote debugging.
+' The third parameter (True) indicates that the capability should be added globally.
+bot.AddAdditionalCapability "goog:chromeOptions", "{""debuggerAddress"":""127.0.0.1:9222""}", True
+
+' Start Chrome. This call will attach to the already‑running Chrome instance
+' that you launched with --remote-debugging-port=9222.
+bot.Start "chrome"
