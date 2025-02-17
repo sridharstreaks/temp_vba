@@ -1,0 +1,46 @@
+Sub UpdateDashboardColumns()
+    Dim wsPivot As Worksheet
+    Dim wsDash As Worksheet
+    Dim pt As PivotTable
+    Dim headerCell As Range
+    Dim newDate As Date
+    Dim foundHeader As Range
+    Dim dashCol As Long
+    Dim lastDataRow As Long
+    Dim i As Long
+    Dim lastPivotCol As Long
+    
+    ' *** Adjust these sheet and pivot table names as needed ***
+    Set wsPivot = ThisWorkbook.Worksheets("PivotSheet")
+    Set wsDash = ThisWorkbook.Worksheets("Dashboard")
+    Set pt = wsPivot.PivotTables("PivotTable1")
+    
+    ' Determine the last used column in the pivot table header row (assumed row 1)
+    lastPivotCol = wsPivot.Cells(1, wsPivot.Columns.Count).End(xlToLeft).Column
+    
+    ' Loop through header cells in the pivot table from column B to the last used column
+    For Each headerCell In wsPivot.Range(wsPivot.Cells(1, 2), wsPivot.Cells(1, lastPivotCol))
+        ' Check if the header cell contains a date
+        If IsDate(headerCell.Value) Then
+            newDate = CDate(headerCell.Value)
+            ' See if this date header already exists in the dashboard (assumed in row 1)
+            Set foundHeader = wsDash.Rows(1).Find(What:=newDate, LookIn:=xlValues, LookAt:=xlWhole)
+            If foundHeader Is Nothing Then
+                ' New date header found – add it to the next available column in Dashboard row 1
+                dashCol = wsDash.Cells(1, wsDash.Columns.Count).End(xlToLeft).Column + 1
+                wsDash.Cells(1, dashCol).Value = newDate
+                
+                ' Determine the last data row in Dashboard (assumed column A has continuous data)
+                lastDataRow = wsDash.Cells(wsDash.Rows.Count, 1).End(xlUp).Row
+                
+                ' Loop through dashboard rows (starting at row 2) and insert a GETPIVOTDATA formula
+                For i = 2 To lastDataRow
+                    ' Adjust the GETPIVOTDATA formula to match your pivot table structure:
+                    ' Here, "Sum of Sales" is the measure, the pivot table starts at cell A3,
+                    ' and "Date" is the pivot field. Change these as needed.
+                    wsDash.Cells(i, dashCol).Formula = "=GETPIVOTDATA(""Sum of Sales"",'PivotSheet'!$A$3,""Date"",""" & Format(newDate, "mm/dd/yyyy") & """)"
+                Next i
+            End If
+        End If
+    Next headerCell
+End Sub
