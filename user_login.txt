@@ -1,74 +1,48 @@
-Sub RunCmdWithInteractivePassword()
-    Dim WshShell As Object
-    Set WshShell = CreateObject("WScript.Shell")
+Sub OpenCmdFileAndMonitorOutput()
+    Dim wsh As Object
+    Set wsh = CreateObject("WScript.Shell")
     
-    ' Full path to your CMD file
-    Dim cmdPath As String
-    cmdPath = "C:\YourFolder\YourScript.cmd"
+    Dim cmdFilePath As String
+    ' Full path to your CMD file:
+    cmdFilePath = "C:\YourFolder\YourScript.cmd"
     
-    ' Extract the folder path from the cmdPath
-    Dim folderPath As String
-    folderPath = "C:\YourFolder"  ' adjust if needed
-    
-    ' Set the current directory to where your CMD file resides.
-    WshShell.CurrentDirectory = folderPath
-    
-    ' Build the command string using CMD.exe with /c to execute the CMD file.
-    ' The /c parameter tells CMD to run the command and then terminate.
+    ' Build a command that opens CMD.exe with /k so that it stays open.
+    ' This will "open" your CMD file in an interactive window.
     Dim command As String
-    command = "cmd.exe /c """ & cmdPath & """"
+    command = "cmd.exe /k """ & cmdFilePath & """"
     
+    ' Launch the command prompt and run the CMD file.
     Dim oExec As Object
-    Set oExec = WshShell.Exec(command)
+    Set oExec = wsh.Exec(command)
     
     Dim sLine As String
-    Dim passwordPromptDetected As Boolean
-    passwordPromptDetected = False
-    
-    ' Continuously loop while the process is running.
+    ' Loop continuously while the process is running.
     Do While oExec.Status = 0
-        ' Read any available output from the process.
+        ' Check any output from the process.
         Do While Not oExec.StdOut.AtEndOfStream
             sLine = oExec.StdOut.ReadLine
-            Debug.Print sLine  ' Optional: log output for debugging.
+            Debug.Print sLine
             
-            ' Detect the password prompt output from your CMD file.
+            ' Look for the password prompt output.
             If InStr(sLine, "Enter password") > 0 Then
-                passwordPromptDetected = True
                 Dim userPassword As String
                 userPassword = InputBox("Please enter the password:", "Password Required")
-                ' Send the user-provided password to the process.
+                ' Send the password to the CMD process.
                 oExec.StdIn.WriteLine userPassword
             End If
             
-            ' Optionally, if an error message is detected in the output.
-            If InStr(sLine, "Error") > 0 Then
-                MsgBox "An error occurred: " & sLine, vbCritical
-                Exit Sub
-            End If
-            
-            ' When the process asks for "Press any key", send an Enter keystroke.
+            ' Look for the "Press any key" prompt.
             If InStr(sLine, "Press any key") > 0 Then
+                ' Simulate a key press by sending a newline.
                 oExec.StdIn.WriteLine ""
             End If
         Loop
-        DoEvents  ' Allow VBA to continue processing.
+        DoEvents  ' Allow VBA to process other events.
     Loop
     
-    ' After the process finishes, read any remaining output.
+    ' Optionally, read any remaining output once the process ends.
     Do While Not oExec.StdOut.AtEndOfStream
         sLine = oExec.StdOut.ReadLine
         Debug.Print sLine
     Loop
-    
-    ' Optionally, check the error stream.
-    If Not oExec.StdErr.AtEndOfStream Then
-        Dim errLine As String
-        Do While Not oExec.StdErr.AtEndOfStream
-            errLine = oExec.StdErr.ReadLine
-            Debug.Print "ERR: " & errLine
-        Loop
-    End If
-    
-    MsgBox "Process completed.", vbInformation
 End Sub
