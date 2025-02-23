@@ -1,17 +1,60 @@
+#If VBA7 Then
+    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Private Declare PtrSafe Function OpenClipboard Lib "user32" (ByVal hwnd As Long) As Long
+    Private Declare PtrSafe Function EmptyClipboard Lib "user32" () As Long
+    Private Declare PtrSafe Function CloseClipboard Lib "user32" () As Long
+    Private Declare PtrSafe Function SetClipboardData Lib "user32" (ByVal uFormat As Long, ByVal hMem As Long) As Long
+    Private Declare PtrSafe Function GlobalAlloc Lib "kernel32" (ByVal wFlags As Long, ByVal dwBytes As Long) As Long
+    Private Declare PtrSafe Function GlobalLock Lib "kernel32" (ByVal hMem As Long) As Long
+    Private Declare PtrSafe Function GlobalUnlock Lib "kernel32" (ByVal hMem As Long) As Long
+    Private Const CF_TEXT As Long = 1
+    Private Const GMEM_MOVEABLE As Long = &H2
+#Else
+    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Private Declare Function OpenClipboard Lib "user32" (ByVal hwnd As Long) As Long
+    Private Declare Function EmptyClipboard Lib "user32" () As Long
+    Private Declare Function CloseClipboard Lib "user32" () As Long
+    Private Declare Function SetClipboardData Lib "user32" (ByVal uFormat As Long, ByVal hMem As Long) As Long
+    Private Declare Function GlobalAlloc Lib "kernel32" (ByVal wFlags As Long, ByVal dwBytes As Long) As Long
+    Private Declare Function GlobalLock Lib "kernel32" (ByVal hMem As Long) As Long
+    Private Declare Function GlobalUnlock Lib "kernel32" (ByVal hMem As Long) As Long
+    Private Const CF_TEXT As Long = 1
+    Private Const GMEM_MOVEABLE As Long = &H2
+#End If
+
 Sub OpenCMDAndPasteCommand()
     Dim cmdCommand As String
     cmdCommand = "echo Hello, this is a test command" ' Change to your desired command
 
+    ' Copy command to clipboard
+    CopyToClipboard cmdCommand
+
     ' Open CMD
     Shell "cmd.exe", vbNormalFocus
-    Application.Wait (Now + TimeValue("00:00:02")) ' Wait for CMD to open
-
-    ' Copy command to clipboard
-    Dim objData As Object
-    Set objData = CreateObject("MSForms.DataObject")
-    objData.SetText cmdCommand
-    objData.PutInClipboard
+    Sleep 1000 ' Wait for CMD to open
 
     ' Simulate Ctrl+V to paste
     Application.SendKeys "^v", True
+End Sub
+
+Sub CopyToClipboard(ByVal Text As String)
+    Dim hGlobal As Long
+    Dim pGlobal As Long
+
+    ' Allocate global memory for the text
+    hGlobal = GlobalAlloc(GMEM_MOVEABLE, Len(Text) + 1)
+    pGlobal = GlobalLock(hGlobal)
+
+    ' Copy the text to the allocated memory
+    If pGlobal <> 0 Then
+        CopyMemory ByVal pGlobal, ByVal Text, Len(Text)
+        GlobalUnlock hGlobal
+
+        ' Open clipboard, empty it, and set new data
+        If OpenClipboard(0) Then
+            EmptyClipboard
+            SetClipboardData CF_TEXT, hGlobal
+            CloseClipboard
+        End If
+    End If
 End Sub
