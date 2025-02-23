@@ -1,48 +1,59 @@
-Sub OpenCmdFileAndMonitorOutput()
+Option Explicit
+
+' Main routine to run a series of commands one after the other
+Sub RunBatchCommands()
+    Dim commands As Variant
+    Dim i As Long
+    
+    ' Define your list of commands (modify these as needed)
+    commands = Array( _
+        "yourCommand1", _
+        "yourCommand2", _
+        "yourCommand3", _
+        "yourCommand4", _
+        "yourCommand5")
+    
+    For i = LBound(commands) To UBound(commands)
+        RunCommandWithResponses commands(i)
+    Next i
+End Sub
+
+' Runs a single command and monitors its output for known prompts.
+Sub RunCommandWithResponses(cmdStr As String)
     Dim wsh As Object
+    Dim execObj As Object
+    Dim outputLine As String
+    
+    ' Create a WScript.Shell object
     Set wsh = CreateObject("WScript.Shell")
     
-    Dim cmdFilePath As String
-    ' Full path to your CMD file:
-    cmdFilePath = "C:\YourFolder\YourScript.cmd"
+    ' Start the command. Using "cmd /c" runs the command then closes the window.
+    ' (If you need an interactive shell, you might try "cmd /k".)
+    Set execObj = wsh.Exec("cmd /c " & cmdStr)
     
-    ' Build a command that opens CMD.exe with /k so that it stays open.
-    ' This will "open" your CMD file in an interactive window.
-    Dim command As String
-    command = "cmd.exe /k """ & cmdFilePath & """"
-    
-    ' Launch the command prompt and run the CMD file.
-    Dim oExec As Object
-    Set oExec = wsh.Exec(command)
-    
-    Dim sLine As String
-    ' Loop continuously while the process is running.
-    Do While oExec.Status = 0
-        ' Check any output from the process.
-        Do While Not oExec.StdOut.AtEndOfStream
-            sLine = oExec.StdOut.ReadLine
-            Debug.Print sLine
+    ' Loop until the process has finished
+    Do While execObj.Status = 0
+        DoEvents  ' Allow VBA to remain responsive
+        
+        ' Check if there is any output to read
+        While Not execObj.StdOut.AtEndOfStream
+            outputLine = execObj.StdOut.ReadLine
+            Debug.Print outputLine   ' (For troubleshooting; view in the Immediate Window)
             
-            ' Look for the password prompt output.
-            If InStr(sLine, "Enter password") > 0 Then
-                Dim userPassword As String
-                userPassword = InputBox("Please enter the password:", "Password Required")
-                ' Send the password to the CMD process.
-                oExec.StdIn.WriteLine userPassword
+            ' Look for known prompts and send appropriate responses
+            If InStr(LCase(outputLine), "pls enter pin") > 0 Then
+                ' Read the PIN (or password) from cell A1 of Sheet1
+                execObj.StdIn.WriteLine ThisWorkbook.Sheets("Sheet1").Range("A1").Value
+            ElseIf InStr(LCase(outputLine), "press any key to continue") > 0 Then
+                ' Sending a carriage return (Enter) should suffice.
+                execObj.StdIn.WriteLine vbCr
             End If
-            
-            ' Look for the "Press any key" prompt.
-            If InStr(sLine, "Press any key") > 0 Then
-                ' Simulate a key press by sending a newline.
-                oExec.StdIn.WriteLine ""
-            End If
-        Loop
-        DoEvents  ' Allow VBA to process other events.
+        Wend
     Loop
     
-    ' Optionally, read any remaining output once the process ends.
-    Do While Not oExec.StdOut.AtEndOfStream
-        sLine = oExec.StdOut.ReadLine
-        Debug.Print sLine
+    ' If needed, process any remaining output after the command completes
+    Do While Not execObj.StdOut.AtEndOfStream
+        outputLine = execObj.StdOut.ReadLine
+        Debug.Print outputLine
     Loop
 End Sub
