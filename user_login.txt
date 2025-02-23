@@ -1,67 +1,94 @@
-Sub RunCommandInCmd(command As String)
-  Dim objShell As Object
-  Set objShell = VBA.CreateObject("WScript.Shell")
+Sub RunCmdAndGetOutput()
 
-  ' Open cmd.exe and execute the command.
-  ' /c carries out the string specified by command and then terminates
-  objShell.Run "cmd /c " & command, 0, False ' 0 = Hidden, False = Don't wait for completion
+    Dim objShell As Object
+    Dim objExec As Object
+    Dim strCommand As String
+    Dim strOutput As String
 
-  'If you want to wait for the command to finish and see the cmd window, use:
-  'objShell.Run "cmd /k " & command, 1, True ' 1 = Normal window, True = Wait for completion
+    ' Command to execute (e.g., "ipconfig /all")
+    strCommand = "ipconfig /all"
 
-  Set objShell = Nothing
-End Sub
+    ' Create a Shell object
+    Set objShell = CreateObject("WScript.Shell")
 
-' Example usage:
-Sub Example()
-  ' Run a simple command to list the directory contents.
-  RunCommandInCmd "dir"
+    ' Execute the command
+    Set objExec = objShell.Exec("%comspec% /c " & strCommand)
 
-  ' Run a command that takes a file path (example). Be mindful of file paths and escaping quotes.
-  ' RunCommandInCmd "type ""C:\My Documents\test.txt""" 'Example to display the contents of a text file.
+    ' Read the output
+    strOutput = objExec.StdOut.ReadAll
 
-  ' Run a command to create a directory.
-  'RunCommandInCmd "md ""C:\NewFolder"""
-End Sub
+    ' Display the output (or process it as needed)
+    MsgBox strOutput
 
-' Example usage with a variable file path:
-Sub ExampleWithPath()
-  Dim filePath As String
-  filePath = "C:\My Documents\test.txt"
-
-  RunCommandInCmd "type """ & filePath & """"
+    ' Clean up
+    Set objExec = Nothing
+    Set objShell = Nothing
 
 End Sub
 
-' Example usage with a variable folder path:
-Sub ExampleWithFolder()
-    Dim folderPath As String
-    folderPath = "C:\NewFolder"
-    RunCommandInCmd "md """ & folderPath & """"
+' Example with error handling and timeout (more robust)
+Sub RunCmdWithTimeout()
+
+    Dim objShell As Object
+    Dim objExec As Object
+    Dim strCommand As String
+    Dim strOutput As String
+    Dim iTimeout As Long
+    Dim startTime As Double
+
+    strCommand = "ping 8.8.8.8 -n 2" ' Example command
+    iTimeout = 5000 ' Timeout in milliseconds (5 seconds)
+
+    Set objShell = CreateObject("WScript.Shell")
+    Set objExec = objShell.Exec("%comspec% /c " & strCommand)
+
+    startTime = Timer * 1000 ' Get start time in milliseconds
+
+    Do While objExec.Status = 0
+        DoEvents ' Allow other processes to run
+        If (Timer * 1000) - startTime > iTimeout Then
+            MsgBox "Command timed out."
+            Exit Sub
+        End If
+    Loop
+
+    strOutput = objExec.StdOut.ReadAll
+
+    MsgBox strOutput
+
+    Set objExec = Nothing
+    Set objShell = Nothing
+
 End Sub
 
-' Example usage with a variable that includes spaces:
-Sub ExampleWithSpaces()
-    Dim myVariable As String
-    myVariable = "This is a test with spaces"
-    RunCommandInCmd "echo """ & myVariable & """"
-End Sub
+' Example that reads stderr for error messages.
+Sub RunCmdWithErrorCheck()
 
-'Example with environment variables:
-Sub ExampleEnvironmentVariable()
-    RunCommandInCmd "echo %TEMP%"
-End Sub
+    Dim objShell As Object
+    Dim objExec As Object
+    Dim strCommand As String
+    Dim strOutput As String
+    Dim strError As String
 
+    strCommand = "nonexistentcommand" ' Example command that will fail
 
-'Example to run a python script:
-Sub RunPythonScript()
-    Dim pythonPath As String
-    Dim scriptPath As String
+    Set objShell = CreateObject("WScript.Shell")
+    Set objExec = objShell.Exec("%comspec% /c " & strCommand)
 
-    'Adjust these paths to your python installation and script location.
-    pythonPath = """C:\Path\To\Python\python.exe"""
-    scriptPath = """C:\Path\To\Your\script.py"""
+    Do While objExec.Status = 0
+        DoEvents
+    Loop
 
-    RunCommandInCmd pythonPath & " " & scriptPath
+    strOutput = objExec.StdOut.ReadAll
+    strError = objExec.StdErr.ReadAll
+
+    If Len(strError) > 0 Then
+        MsgBox "Error: " & strError
+    Else
+        MsgBox "Output: " & strOutput
+    End If
+
+    Set objExec = Nothing
+    Set objShell = Nothing
 
 End Sub
