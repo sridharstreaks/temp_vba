@@ -1,75 +1,39 @@
-Option Explicit
+Sub ConnectToSpecificWindow()
 
-#If VBA7 Then
-    Private Declare PtrSafe Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
-    Private Declare PtrSafe Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As LongPtr, ByVal hWndChildAfter As LongPtr, ByVal lpszClass As String, ByVal lpszWindow As String) As LongPtr
-    Private Declare PtrSafe Function SendMessage Lib "user32" Alias "SendMessageA" (ByVal hWnd As LongPtr, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
-    Private Declare PtrSafe Function SetForegroundWindow Lib "user32" (ByVal hWnd As LongPtr) As Long
-    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
-#Else
-    Private Declare Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As Long
-    Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindow As String) As Long
-    Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
-    Private Declare Function SetForegroundWindow Lib "user32" (ByVal hWnd As Long) As Long
-    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
-#End If
+    Dim targetWindowTitle As String
+    Dim hwnd As Long
+    Dim buttonHwnd As Long
 
-Const BM_CLICK As Long = &HF5
+    ' Specify the exact window title you're looking for.
+    targetWindowTitle = "Your Target Window Title" ' Replace with the actual window title
 
-Sub ActivateAndConnect()
-    Dim windowTitle As String
-    windowTitle = "MyWindow"   ' <<< Replace with your target window title
-    
-    Dim hWndTarget As LongPtr
-    Dim hConnectButton As LongPtr
-    Dim hPopupWnd As LongPtr
-    Dim hYesButton As LongPtr
-    
-    ' Locate the target window by its title (it may be among many open windows)
-    hWndTarget = FindWindow(vbNullString, windowTitle)
-    If hWndTarget = 0 Then
-        MsgBox "Window '" & windowTitle & "' not found."
+    ' Find the window handle.
+    hwnd = FindWindow(vbNullString, targetWindowTitle)
+
+    If hwnd = 0 Then
+        MsgBox "Window '" & targetWindowTitle & "' not found."
         Exit Sub
     End If
-    
-    ' Bring the target window to the foreground (i.e. activate it)
-    SetForegroundWindow hWndTarget
-    Sleep 500  ' Brief pause to ensure the window is active
-    
-    ' Find the "connect" button within the target window
-    hConnectButton = FindWindowEx(hWndTarget, 0, "Button", "connect")
-    If hConnectButton = 0 Then
-        MsgBox """connect"" button not found in the window."
+
+    ' Find the "Connect" button within the found window.
+    buttonHwnd = FindWindowEx(hwnd, 0, "Button", "Connect") 'Adjust class and caption if needed.
+
+    If buttonHwnd = 0 Then
+        MsgBox "Connect button not found in window '" & targetWindowTitle & "'."
         Exit Sub
     End If
-    
-    ' Click the "connect" button
-    SendMessage hConnectButton, BM_CLICK, 0, 0
-    
-    ' Allow time for the popup to appear (adjust this wait time as needed)
-    Sleep 2000
-    
-    ' Look for a popup window with the same title that appears after clicking connect.
-    ' Using FindWindowEx with a parent of 0 and searching after the main window handle.
-    hPopupWnd = FindWindowEx(0, hWndTarget, vbNullString, windowTitle)
-    
-    If hPopupWnd <> 0 Then
-        ' Bring the popup to the foreground
-        SetForegroundWindow hPopupWnd
-        Sleep 500
-        
-        ' Locate the "yes" button on the popup
-        hYesButton = FindWindowEx(hPopupWnd, 0, "Button", "yes")
-        If hYesButton = 0 Then
-            MsgBox """yes"" button not found in the popup window."
-            Exit Sub
-        End If
-        
-        ' Click the "yes" button
-        SendMessage hYesButton, BM_CLICK, 0, 0
-    Else
-        ' If no popup appears, exit the macro.
-        MsgBox "Popup window did not appear. Exiting."
-        Exit Sub
-    End If
+
+    ' Click the "Connect" button.
+    SendMessage buttonHwnd, BM_CLICK, 0, 0
+
+    MsgBox "Connect button clicked in window '" & targetWindowTitle & "'."
+
 End Sub
+
+' API Declarations (Place these at the top of your module)
+Private Declare Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As Long
+Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindowName As String) As Long
+Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" (ByVal hwnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+
+' Constant for button click message
+Private Const BM_CLICK As Long = &HF5
