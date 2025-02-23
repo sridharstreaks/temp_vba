@@ -1,62 +1,67 @@
-#If VBA7 Then
-    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
-    Private Declare PtrSafe Function OpenClipboard Lib "user32" (ByVal hwnd As Long) As Long
-    Private Declare PtrSafe Function EmptyClipboard Lib "user32" () As Long
-    Private Declare PtrSafe Function CloseClipboard Lib "user32" () As Long
-    Private Declare PtrSafe Function SetClipboardData Lib "user32" (ByVal uFormat As Long, ByVal hMem As Long) As Long
-    Private Declare PtrSafe Function GlobalAlloc Lib "kernel32" (ByVal wFlags As Long, ByVal dwBytes As Long) As Long
-    Private Declare PtrSafe Function GlobalLock Lib "kernel32" (ByVal hMem As Long) As Long
-    Private Declare PtrSafe Function GlobalUnlock Lib "kernel32" (ByVal hMem As Long) As Long
-    Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As LongPtr, ByVal Source As LongPtr, ByVal Length As LongPtr)
-    Private Const CF_TEXT As Long = 1
-    Private Const GMEM_MOVEABLE As Long = &H2
-#Else
-    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
-    Private Declare Function OpenClipboard Lib "user32" (ByVal hwnd As Long) As Long
-    Private Declare Function EmptyClipboard Lib "user32" () As Long
-    Private Declare Function CloseClipboard Lib "user32" () As Long
-    Private Declare Function SetClipboardData Lib "user32" (ByVal uFormat As Long, ByVal hMem As Long) As Long
-    Private Declare Function GlobalAlloc Lib "kernel32" (ByVal wFlags As Long, ByVal dwBytes As Long) As Long
-    Private Declare Function GlobalLock Lib "kernel32" (ByVal hMem As Long) As Long
-    Private Declare Function GlobalUnlock Lib "kernel32" (ByVal hMem As Long) As Long
-    Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As Long, ByVal Source As Long, ByVal Length As Long)
-    Private Const CF_TEXT As Long = 1
-    Private Const GMEM_MOVEABLE As Long = &H2
-#End If
+Sub RunCommandInCmd(command As String)
+  Dim objShell As Object
+  Set objShell = VBA.CreateObject("WScript.Shell")
 
-Sub OpenCMDAndPasteCommand()
-    Dim cmdCommand As String
-    cmdCommand = "echo Hello, this is a test command" ' Change this to your command
+  ' Open cmd.exe and execute the command.
+  ' /c carries out the string specified by command and then terminates
+  objShell.Run "cmd /c " & command, 0, False ' 0 = Hidden, False = Don't wait for completion
 
-    ' Copy command to clipboard
-    CopyToClipboard cmdCommand
+  'If you want to wait for the command to finish and see the cmd window, use:
+  'objShell.Run "cmd /k " & command, 1, True ' 1 = Normal window, True = Wait for completion
 
-    ' Open CMD
-    Shell "cmd.exe", vbNormalFocus
-    Sleep 1000 ' Wait for CMD to open
-
-    ' Simulate Ctrl+V to paste
-    Application.SendKeys "^v", True
+  Set objShell = Nothing
 End Sub
 
-Sub CopyToClipboard(ByVal Text As String)
-    Dim hGlobal As LongPtr
-    Dim pGlobal As LongPtr
+' Example usage:
+Sub Example()
+  ' Run a simple command to list the directory contents.
+  RunCommandInCmd "dir"
 
-    ' Allocate global memory for the text
-    hGlobal = GlobalAlloc(GMEM_MOVEABLE, Len(Text) + 1)
-    pGlobal = GlobalLock(hGlobal)
+  ' Run a command that takes a file path (example). Be mindful of file paths and escaping quotes.
+  ' RunCommandInCmd "type ""C:\My Documents\test.txt""" 'Example to display the contents of a text file.
 
-    ' Copy the text to the allocated memory
-    If pGlobal <> 0 Then
-        CopyMemory pGlobal, StrPtr(Text), Len(Text) * 2
-        GlobalUnlock hGlobal
+  ' Run a command to create a directory.
+  'RunCommandInCmd "md ""C:\NewFolder"""
+End Sub
 
-        ' Open clipboard, empty it, and set new data
-        If OpenClipboard(0) Then
-            EmptyClipboard
-            SetClipboardData CF_TEXT, hGlobal
-            CloseClipboard
-        End If
-    End If
+' Example usage with a variable file path:
+Sub ExampleWithPath()
+  Dim filePath As String
+  filePath = "C:\My Documents\test.txt"
+
+  RunCommandInCmd "type """ & filePath & """"
+
+End Sub
+
+' Example usage with a variable folder path:
+Sub ExampleWithFolder()
+    Dim folderPath As String
+    folderPath = "C:\NewFolder"
+    RunCommandInCmd "md """ & folderPath & """"
+End Sub
+
+' Example usage with a variable that includes spaces:
+Sub ExampleWithSpaces()
+    Dim myVariable As String
+    myVariable = "This is a test with spaces"
+    RunCommandInCmd "echo """ & myVariable & """"
+End Sub
+
+'Example with environment variables:
+Sub ExampleEnvironmentVariable()
+    RunCommandInCmd "echo %TEMP%"
+End Sub
+
+
+'Example to run a python script:
+Sub RunPythonScript()
+    Dim pythonPath As String
+    Dim scriptPath As String
+
+    'Adjust these paths to your python installation and script location.
+    pythonPath = """C:\Path\To\Python\python.exe"""
+    scriptPath = """C:\Path\To\Your\script.py"""
+
+    RunCommandInCmd pythonPath & " " & scriptPath
+
 End Sub
