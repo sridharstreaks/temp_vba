@@ -1,23 +1,73 @@
-Sub RunCommandAndReadOutput()
+Sub RunCommandWithPassword()
     Dim shell As Object
     Dim execObj As Object
     Dim command As String
     Dim output As String
-
-    ' Set command to execute (replace "ipconfig" with your command)
-    command = "cmd /c ipconfig"
+    Dim pin As String
+    Dim otpPrompt As Boolean
+    
+    ' Read PIN from Excel cell A1
+    pin = ThisWorkbook.Sheets("Sheet1").Range("A1").Value
 
     ' Create Shell object
     Set shell = CreateObject("WScript.Shell")
     
-    ' Execute command and capture output
+    ' Open Command Prompt and keep it open
+    command = "cmd.exe"
     Set execObj = shell.Exec(command)
     
-    ' Read output
-    output = execObj.StdOut.ReadAll
-    
-    ' Display the output
-    MsgBox output, vbInformation, "Command Output"
+    ' Wait for CMD to initialize
+    Application.Wait Now + TimeValue("00:00:02")
+
+    ' Execute the first command
+    shell.SendKeys "your_first_command" & vbCr
+    Application.Wait Now + TimeValue("00:00:02")
+
+    ' Loop until "Enter PIN" appears
+    Do While execObj.Status = 0
+        output = execObj.StdOut.ReadAll
+        If InStr(1, output, "Enter PIN", vbTextCompare) > 0 Then
+            shell.SendKeys pin & vbCr
+            Exit Do
+        End If
+        DoEvents
+    Loop
+
+    ' Wait for OTP prompt (manual user input)
+    otpPrompt = False
+    Do While execObj.Status = 0
+        output = execObj.StdOut.ReadAll
+        If InStr(1, output, "Enter OTP", vbTextCompare) > 0 Then
+            otpPrompt = True
+            MsgBox "Enter OTP manually in the Command Prompt and press OK.", vbInformation
+            Exit Do
+        End If
+        DoEvents
+    Loop
+
+    ' Wait for success confirmation
+    Do While execObj.Status = 0
+        output = execObj.StdOut.ReadAll
+        If InStr(1, output, "successful", vbTextCompare) > 0 Then
+            Exit Do
+        End If
+        DoEvents
+    Loop
+
+    ' Execute second command
+    shell.SendKeys "your_second_command" & vbCr
+    Application.Wait Now + TimeValue("00:00:02")
+
+    ' Execute third command
+    shell.SendKeys "your_third_command" & vbCr
+    Application.Wait Now + TimeValue("00:00:02")
+
+    ' Execute fourth command (pause)
+    shell.SendKeys "pause" & vbCr
+    Application.Wait Now + TimeValue("00:00:02")
+
+    ' Press a key to continue
+    shell.SendKeys "{ENTER}"
 
     ' Clean up
     Set execObj = Nothing
