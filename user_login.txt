@@ -7,6 +7,7 @@
     Private Declare PtrSafe Function GlobalAlloc Lib "kernel32" (ByVal wFlags As Long, ByVal dwBytes As Long) As Long
     Private Declare PtrSafe Function GlobalLock Lib "kernel32" (ByVal hMem As Long) As Long
     Private Declare PtrSafe Function GlobalUnlock Lib "kernel32" (ByVal hMem As Long) As Long
+    Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As LongPtr, ByVal Source As LongPtr, ByVal Length As LongPtr)
     Private Const CF_TEXT As Long = 1
     Private Const GMEM_MOVEABLE As Long = &H2
 #Else
@@ -18,13 +19,14 @@
     Private Declare Function GlobalAlloc Lib "kernel32" (ByVal wFlags As Long, ByVal dwBytes As Long) As Long
     Private Declare Function GlobalLock Lib "kernel32" (ByVal hMem As Long) As Long
     Private Declare Function GlobalUnlock Lib "kernel32" (ByVal hMem As Long) As Long
+    Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As Long, ByVal Source As Long, ByVal Length As Long)
     Private Const CF_TEXT As Long = 1
     Private Const GMEM_MOVEABLE As Long = &H2
 #End If
 
 Sub OpenCMDAndPasteCommand()
     Dim cmdCommand As String
-    cmdCommand = "echo Hello, this is a test command" ' Change to your desired command
+    cmdCommand = "echo Hello, this is a test command" ' Change this to your command
 
     ' Copy command to clipboard
     CopyToClipboard cmdCommand
@@ -38,8 +40,8 @@ Sub OpenCMDAndPasteCommand()
 End Sub
 
 Sub CopyToClipboard(ByVal Text As String)
-    Dim hGlobal As Long
-    Dim pGlobal As Long
+    Dim hGlobal As LongPtr
+    Dim pGlobal As LongPtr
 
     ' Allocate global memory for the text
     hGlobal = GlobalAlloc(GMEM_MOVEABLE, Len(Text) + 1)
@@ -47,7 +49,7 @@ Sub CopyToClipboard(ByVal Text As String)
 
     ' Copy the text to the allocated memory
     If pGlobal <> 0 Then
-        CopyMemory ByVal pGlobal, ByVal Text, Len(Text)
+        CopyMemory pGlobal, StrPtr(Text), Len(Text) * 2
         GlobalUnlock hGlobal
 
         ' Open clipboard, empty it, and set new data
