@@ -1,58 +1,73 @@
-Function FindWindowByName(windowName As String) As Long
-  ' Finds a window by its name and returns its handle (hWnd).
-  ' Returns 0 if the window is not found.
+Option Explicit
 
-  Dim hWnd As Long
-  Dim currentWindowName As String
-  Dim currentWindowLength As Long
+#If VBA7 Then
+    Private Declare PtrSafe Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
+    Private Declare PtrSafe Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As LongPtr, ByVal hWndChildAfter As LongPtr, ByVal lpszClass As String, ByVal lpszWindow As String) As LongPtr
+    Private Declare PtrSafe Function SendMessage Lib "user32" Alias "SendMessageA" (ByVal hWnd As LongPtr, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+    Private Declare PtrSafe Function GetForegroundWindow Lib "user32" () As LongPtr
+    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#Else
+    Private Declare Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As Long
+    Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindow As String) As Long
+    Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+    Private Declare Function GetForegroundWindow Lib "user32" () As Long
+    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#End If
 
-  hWnd = FindWindow(vbNullString, windowName)
+Const BM_CLICK As Long = &HF5
 
-  If hWnd = 0 Then
-    'Try finding the window with a partial match if the exact match fails
-    hWnd = FindWindow(vbNullString, vbNullString) 'Start with the first window
-    Do While hWnd <> 0
-        currentWindowLength = GetWindowTextLength(hWnd) + 1
-        currentWindowName = String$(currentWindowLength, 0)
-        GetWindowText hWnd, currentWindowName, currentWindowLength
-
-        If InStr(1, currentWindowName, windowName, vbTextCompare) > 0 Then
-            Exit Do 'Found a window with the provided string in it's name.
+Sub ConnectAndConfirm()
+    Dim windowTitle As String
+    windowTitle = "MyWindow"  ' <<< Replace with the actual window title
+    
+    Dim hWndMain As LongPtr
+    Dim hConnectButton As LongPtr
+    Dim hPopupWnd As LongPtr
+    Dim hYesButton As LongPtr
+    
+    ' Locate the main window by its title.
+    hWndMain = FindWindow(vbNullString, windowTitle)
+    If hWndMain = 0 Then
+        MsgBox "Window '" & windowTitle & "' not found."
+        Exit Sub
+    End If
+    
+    ' Check if the found window is currently active.
+    If hWndMain <> GetForegroundWindow() Then
+        MsgBox "The window is not active. Please activate it and try again."
+        Exit Sub
+    End If
+    
+    ' Find the "connect" button within the main window.
+    hConnectButton = FindWindowEx(hWndMain, 0, "Button", "connect")
+    If hConnectButton = 0 Then
+        MsgBox """connect"" button not found."
+        Exit Sub
+    End If
+    
+    ' Click the "connect" button.
+    SendMessage hConnectButton, BM_CLICK, 0, 0
+    
+    ' Allow time for the popup to appear.
+    Sleep 2000  ' Wait 2 seconds (adjust as needed)
+    
+    ' Attempt to find a second window with the same title.
+    ' Using FindWindowEx with hWndMain as the previous window handle should return a subsequent instance if available.
+    hPopupWnd = FindWindowEx(0, hWndMain, vbNullString, windowTitle)
+    
+    If hPopupWnd <> 0 And hPopupWnd <> hWndMain Then
+        ' Found the popup. Now find its "yes" button.
+        hYesButton = FindWindowEx(hPopupWnd, 0, "Button", "yes")
+        If hYesButton = 0 Then
+            MsgBox """yes"" button not found in the popup window."
+            Exit Sub
         End If
-
-        hWnd = FindWindowEx(0, hWnd, vbNullString, vbNullString) 'Get the next window.
-    Loop
-
-  End If
-
-  FindWindowByName = hWnd
-
-End Function
-
-' Example Usage:
-Sub ExampleFindWindow()
-  Dim targetWindowHandle As Long
-  Dim windowTitle As String
-
-  windowTitle = "Calculator" ' Replace with the actual window name
-
-  targetWindowHandle = FindWindowByName(windowTitle)
-
-  If targetWindowHandle <> 0 Then
-    MsgBox "Window '" & windowTitle & "' found. Handle: " & targetWindowHandle
-    ' You can now use the handle to interact with the window.
-    ' For example, to bring it to the foreground:
-    ' SetForegroundWindow targetWindowHandle
-  Else
-    MsgBox "Window '" & windowTitle & "' not found."
-  End If
-
+        
+        ' Click the "yes" button.
+        SendMessage hYesButton, BM_CLICK, 0, 0
+    Else
+        ' If the popup did not appear, exit the procedure (closing the VBA macro).
+        MsgBox "Popup did not appear. Exiting."
+        End
+    End If
 End Sub
-
-'API Declarations (Place these at the top of your module):
-Private Declare Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As Long
-Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindow As String) As Long
-Private Declare Function GetWindowText Lib "user32" Alias "GetWindowTextA" (ByVal hWnd As Long, ByVal lpString As String, ByVal cch As Long) As Long
-Private Declare Function GetWindowTextLength Lib "user32" Alias "GetWindowTextLengthA" (ByVal hWnd As Long) As Long
-Private Declare Function SetForegroundWindow Lib "user32" (ByVal hWnd As Long) As Long
-
