@@ -1,39 +1,65 @@
-Sub ConnectToSpecificWindow()
+Option Explicit
 
+#If VBA7 Then
+    Private Declare PtrSafe Function FindWindow Lib "user32" Alias "FindWindowA" ( _
+        ByVal lpClassName As String, _
+        ByVal lpWindowName As String) As LongPtr
+
+    Private Declare PtrSafe Function FindWindowEx Lib "user32" Alias "FindWindowExA" ( _
+        ByVal hWndParent As LongPtr, _
+        ByVal hWndChildAfter As LongPtr, _
+        ByVal lpszClass As String, _
+        ByVal lpszWindow As String) As LongPtr
+
+    Private Declare PtrSafe Function SendMessage Lib "user32" Alias "SendMessageA" ( _
+        ByVal hWnd As LongPtr, _
+        ByVal wMsg As Long, _
+        ByVal wParam As LongPtr, _
+        ByVal lParam As LongPtr) As LongPtr
+#Else
+    Private Declare Function FindWindow Lib "user32" Alias "FindWindowA" ( _
+        ByVal lpClassName As String, _
+        ByVal lpWindowName As String) As Long
+
+    Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" ( _
+        ByVal hWndParent As Long, _
+        ByVal hWndChildAfter As Long, _
+        ByVal lpszClass As String, _
+        ByVal lpszWindow As String) As Long
+
+    Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" ( _
+        ByVal hWnd As Long, _
+        ByVal wMsg As Long, _
+        ByVal wParam As Long, _
+        ByVal lParam As Long) As Long
+#End If
+
+Const BM_CLICK As Long = &HF5
+
+Sub ClickConnectButton()
+    Dim hWnd As LongPtr
+    Dim hWndButton As LongPtr
     Dim targetWindowTitle As String
-    Dim hwnd As Long
-    Dim buttonHwnd As Long
-
-    ' Specify the exact window title you're looking for.
-    targetWindowTitle = "Your Target Window Title" ' Replace with the actual window title
-
-    ' Find the window handle.
-    hwnd = FindWindow(vbNullString, targetWindowTitle)
-
-    If hwnd = 0 Then
-        MsgBox "Window '" & targetWindowTitle & "' not found."
+    Dim targetButtonText As String
+    
+    ' Set the target window title and button text
+    targetWindowTitle = "Your Window Name Here"  ' Replace with your window’s title
+    targetButtonText = "Connect"                  ' The button text
+    
+    ' Find the window by its title
+    hWnd = FindWindow(vbNullString, targetWindowTitle)
+    If hWnd = 0 Then
+        MsgBox "Target window not found!", vbExclamation
         Exit Sub
     End If
-
-    ' Find the "Connect" button within the found window.
-    buttonHwnd = FindWindowEx(hwnd, 0, "Button", "Connect") 'Adjust class and caption if needed.
-
-    If buttonHwnd = 0 Then
-        MsgBox "Connect button not found in window '" & targetWindowTitle & "'."
+    
+    ' Find the "Connect" button within the window
+    hWndButton = FindWindowEx(hWnd, 0, "Button", targetButtonText)
+    If hWndButton = 0 Then
+        MsgBox "Connect button not found!", vbExclamation
         Exit Sub
     End If
-
-    ' Click the "Connect" button.
-    SendMessage buttonHwnd, BM_CLICK, 0, 0
-
-    MsgBox "Connect button clicked in window '" & targetWindowTitle & "'."
-
+    
+    ' Simulate a click on the button
+    SendMessage hWndButton, BM_CLICK, 0, 0
 End Sub
-
-' API Declarations (Place these at the top of your module)
-Private Declare Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As Long
-Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindowName As String) As Long
-Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" (ByVal hwnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
-
-' Constant for button click message
-Private Const BM_CLICK As Long = &HF5
