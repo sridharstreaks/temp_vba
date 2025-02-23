@@ -1,93 +1,64 @@
-Sub RunCmdAndGetOutput()
+Sub ExecuteCommandsWithPinAndOTP()
 
     Dim objShell As Object
     Dim objExec As Object
-    Dim strCommand As String
-    Dim strOutput As String
-
-    ' Command to execute (e.g., "ipconfig /all")
-    strCommand = "ipconfig /all"
-
-    ' Create a Shell object
-    Set objShell = CreateObject("WScript.Shell")
-
-    ' Execute the command
-    Set objExec = objShell.Exec("%comspec% /c " & strCommand)
-
-    ' Read the output
-    strOutput = objExec.StdOut.ReadAll
-
-    ' Display the output (or process it as needed)
-    MsgBox strOutput
-
-    ' Clean up
-    Set objExec = Nothing
-    Set objShell = Nothing
-
-End Sub
-
-' Example with error handling and timeout (more robust)
-Sub RunCmdWithTimeout()
-
-    Dim objShell As Object
-    Dim objExec As Object
-    Dim strCommand As String
-    Dim strOutput As String
-    Dim iTimeout As Long
+    Dim strCommand1 As String, strCommand2 As String, strCommand3 As String
+    Dim strPin As String, strOutput As String
+    Dim blnPinEntered As Boolean, blnOTPSuccess As Boolean
     Dim startTime As Double
 
-    strCommand = "ping 8.8.8.8 -n 2" ' Example command
-    iTimeout = 5000 ' Timeout in milliseconds (5 seconds)
+    ' Commands to execute
+    strCommand1 = "your_first_command" ' Replace with your actual command
+    strCommand2 = "your_second_command" ' Replace with your actual command
+    strCommand3 = "your_third_command" ' Replace with your actual command
 
+    ' Get the PIN from cell A1
+    strPin = ThisWorkbook.Sheets("Sheet1").Range("A1").Value
+
+    ' Create a shell object
     Set objShell = CreateObject("WScript.Shell")
-    Set objExec = objShell.Exec("%comspec% /c " & strCommand)
 
-    startTime = Timer * 1000 ' Get start time in milliseconds
+    ' Execute the first command
+    Set objExec = objShell.Exec("cmd /c " & strCommand1)
 
-    Do While objExec.Status = 0
-        DoEvents ' Allow other processes to run
-        If (Timer * 1000) - startTime > iTimeout Then
-            MsgBox "Command timed out."
-            Exit Sub
+    ' Wait for the "enter pin" prompt and paste the PIN
+    Do While objExec.StdOut.AtEndOfStream = False
+        strOutput = objExec.StdOut.ReadAll
+        If InStr(1, LCase(strOutput), "enter pin", vbTextCompare) > 0 And Not blnPinEntered Then
+            objExec.StdIn.WriteLine strPin
+            objExec.StdIn.WriteLine "" ' Simulate Enter key
+            blnPinEntered = True
         End If
+        DoEvents ' Allow other processes to run
     Loop
 
-    strOutput = objExec.StdOut.ReadAll
-
-    MsgBox strOutput
-
-    Set objExec = Nothing
-    Set objShell = Nothing
-
-End Sub
-
-' Example that reads stderr for error messages.
-Sub RunCmdWithErrorCheck()
-
-    Dim objShell As Object
-    Dim objExec As Object
-    Dim strCommand As String
-    Dim strOutput As String
-    Dim strError As String
-
-    strCommand = "nonexistentcommand" ' Example command that will fail
-
-    Set objShell = CreateObject("WScript.Shell")
-    Set objExec = objShell.Exec("%comspec% /c " & strCommand)
-
-    Do While objExec.Status = 0
+    ' Wait for "otp" and then check for "successful"
+    Do While objExec.StdOut.AtEndOfStream = False
+        strOutput = objExec.StdOut.ReadAll
+        If InStr(1, LCase(strOutput), "otp", vbTextCompare) > 0 Then
+            startTime = Timer 'Start timer, to avoid infinite loop.
+            Do While objExec.StdOut.AtEndOfStream = False And Timer - startTime < 30 'Wait for success, or timeout.
+                strOutput = objExec.StdOut.ReadAll
+                If InStr(1, LCase(strOutput), "successful", vbTextCompare) > 0 Then
+                    blnOTPSuccess = True
+                    Exit Do
+                End If
+                DoEvents
+            Loop
+            Exit Do
+        End If
         DoEvents
     Loop
 
-    strOutput = objExec.StdOut.ReadAll
-    strError = objExec.StdErr.ReadAll
-
-    If Len(strError) > 0 Then
-        MsgBox "Error: " & strError
+    ' Execute the second and third commands if OTP was successful
+    If blnOTPSuccess Then
+        objShell.Run "cmd /c " & strCommand2, 0, True
+        objShell.Run "cmd /c " & strCommand3, 0, True
     Else
-        MsgBox "Output: " & strOutput
+        MsgBox "OTP verification failed or timed out."
     End If
 
+    ' Clean up
     Set objExec = Nothing
     Set objShell = Nothing
 
