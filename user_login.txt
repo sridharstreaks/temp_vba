@@ -1,75 +1,17 @@
-Sub RunCommandWithPassword()
-    Dim shell As Object
-    Dim execObj As Object
-    Dim command As String
-    Dim output As String
-    Dim pin As String
-    Dim otpPrompt As Boolean
-    
-    ' Read PIN from Excel cell A1
-    pin = ThisWorkbook.Sheets("Sheet1").Range("A1").Value
+Sub OpenCMDAndPasteCommand()
+    Dim cmdCommand As String
+    cmdCommand = "echo Hello, this is a test command" ' Change to your desired command
 
-    ' Create Shell object
-    Set shell = CreateObject("WScript.Shell")
-    
-    ' Open Command Prompt and keep it open
-    command = "cmd.exe"
-    Set execObj = shell.Exec(command)
-    
-    ' Wait for CMD to initialize
-    Application.Wait Now + TimeValue("00:00:02")
+    ' Open CMD
+    Shell "cmd.exe", vbNormalFocus
+    Application.Wait (Now + TimeValue("00:00:02")) ' Wait for CMD to open
 
-    ' Execute the first command
-    shell.SendKeys "your_first_command" & vbCr
-    Application.Wait Now + TimeValue("00:00:02")
+    ' Copy command to clipboard
+    Dim objData As Object
+    Set objData = CreateObject("MSForms.DataObject")
+    objData.SetText cmdCommand
+    objData.PutInClipboard
 
-    ' Loop until "Enter PIN" appears
-    Do While execObj.Status = 0
-        output = execObj.StdOut.ReadAll
-        If InStr(1, output, "Enter PIN", vbTextCompare) > 0 Then
-            shell.SendKeys pin & vbCr
-            Exit Do
-        End If
-        DoEvents
-    Loop
-
-    ' Wait for OTP prompt (manual user input)
-    otpPrompt = False
-    Do While execObj.Status = 0
-        output = execObj.StdOut.ReadAll
-        If InStr(1, output, "Enter OTP", vbTextCompare) > 0 Then
-            otpPrompt = True
-            MsgBox "Enter OTP manually in the Command Prompt and press OK.", vbInformation
-            Exit Do
-        End If
-        DoEvents
-    Loop
-
-    ' Wait for success confirmation
-    Do While execObj.Status = 0
-        output = execObj.StdOut.ReadAll
-        If InStr(1, output, "successful", vbTextCompare) > 0 Then
-            Exit Do
-        End If
-        DoEvents
-    Loop
-
-    ' Execute second command
-    shell.SendKeys "your_second_command" & vbCr
-    Application.Wait Now + TimeValue("00:00:02")
-
-    ' Execute third command
-    shell.SendKeys "your_third_command" & vbCr
-    Application.Wait Now + TimeValue("00:00:02")
-
-    ' Execute fourth command (pause)
-    shell.SendKeys "pause" & vbCr
-    Application.Wait Now + TimeValue("00:00:02")
-
-    ' Press a key to continue
-    shell.SendKeys "{ENTER}"
-
-    ' Clean up
-    Set execObj = Nothing
-    Set shell = Nothing
+    ' Simulate Ctrl+V to paste
+    Application.SendKeys "^v", True
 End Sub
