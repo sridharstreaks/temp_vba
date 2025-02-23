@@ -1,59 +1,25 @@
-Option Explicit
-
-' Main routine to run a series of commands one after the other
-Sub RunBatchCommands()
-    Dim commands As Variant
-    Dim i As Long
-    
-    ' Define your list of commands (modify these as needed)
-    commands = Array( _
-        "yourCommand1", _
-        "yourCommand2", _
-        "yourCommand3", _
-        "yourCommand4", _
-        "yourCommand5")
-    
-    For i = LBound(commands) To UBound(commands)
-        RunCommandWithResponses commands(i)
-    Next i
-End Sub
-
-' Runs a single command and monitors its output for known prompts.
-Sub RunCommandWithResponses(cmdStr As String)
-    Dim wsh As Object
+Sub RunCommandAndReadOutput()
+    Dim shell As Object
     Dim execObj As Object
-    Dim outputLine As String
+    Dim command As String
+    Dim output As String
+
+    ' Set command to execute (replace "ipconfig" with your command)
+    command = "cmd /c ipconfig"
+
+    ' Create Shell object
+    Set shell = CreateObject("WScript.Shell")
     
-    ' Create a WScript.Shell object
-    Set wsh = CreateObject("WScript.Shell")
+    ' Execute command and capture output
+    Set execObj = shell.Exec(command)
     
-    ' Start the command. Using "cmd /c" runs the command then closes the window.
-    ' (If you need an interactive shell, you might try "cmd /k".)
-    Set execObj = wsh.Exec("cmd /c " & cmdStr)
+    ' Read output
+    output = execObj.StdOut.ReadAll
     
-    ' Loop until the process has finished
-    Do While execObj.Status = 0
-        DoEvents  ' Allow VBA to remain responsive
-        
-        ' Check if there is any output to read
-        While Not execObj.StdOut.AtEndOfStream
-            outputLine = execObj.StdOut.ReadLine
-            Debug.Print outputLine   ' (For troubleshooting; view in the Immediate Window)
-            
-            ' Look for known prompts and send appropriate responses
-            If InStr(LCase(outputLine), "pls enter pin") > 0 Then
-                ' Read the PIN (or password) from cell A1 of Sheet1
-                execObj.StdIn.WriteLine ThisWorkbook.Sheets("Sheet1").Range("A1").Value
-            ElseIf InStr(LCase(outputLine), "press any key to continue") > 0 Then
-                ' Sending a carriage return (Enter) should suffice.
-                execObj.StdIn.WriteLine vbCr
-            End If
-        Wend
-    Loop
-    
-    ' If needed, process any remaining output after the command completes
-    Do While Not execObj.StdOut.AtEndOfStream
-        outputLine = execObj.StdOut.ReadLine
-        Debug.Print outputLine
-    Loop
+    ' Display the output
+    MsgBox output, vbInformation, "Command Output"
+
+    ' Clean up
+    Set execObj = Nothing
+    Set shell = Nothing
 End Sub
