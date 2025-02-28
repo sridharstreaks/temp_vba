@@ -1,53 +1,79 @@
 Sub NavigateAndClickButton()
     Dim driver As New Selenium.ChromeDriver
+    Dim wb As Workbook
     Dim ws As Worksheet
+    Dim filePath As String
     Dim colLetter As String, colNumber As Integer
-    Dim startRow As Integer, lastRow As Integer
+    Dim startRow As Long, lastRow As Long
     Dim userInput As String
     
-    ' Set worksheet
-    Set ws = ActiveSheet
+    ' Prompt the user to select an Excel workbook (xlsx)
+    filePath = Application.GetOpenFilename(FileFilter:="Excel Files (*.xlsx), *.xlsx", Title:="Select Excel Workbook")
+    If filePath = "False" Then Exit Sub ' User canceled the file dialog
     
-    ' Ask for the column letter
+    Set wb = Workbooks.Open(filePath)
+    Set ws = wb.ActiveSheet ' Change if you need a specific sheet
+    
+    ' Ask for the column letter that contains URLs
     colLetter = InputBox("Enter the column letter containing URLs (e.g., A):")
     If colLetter = "" Then Exit Sub
-    
-    ' Convert column letter to number
-    colNumber = Range(colLetter & "1").Column
+    colNumber = ws.Range(colLetter & "1").Column
     
     ' Ask for the start row
     userInput = InputBox("Enter the start row (e.g., 2):")
     If userInput = "" Then Exit Sub
-    startRow = CInt(userInput)
+    startRow = CLng(userInput)
     
-    ' Ask for the last row
+    ' Ask for the last row (or auto-detect if left blank)
     userInput = InputBox("Enter the last row (leave blank to auto-detect last filled row):")
     If userInput = "" Then
         lastRow = ws.Cells(ws.Rows.Count, colNumber).End(xlUp).Row
     Else
-        lastRow = CInt(userInput)
+        lastRow = CLng(userInput)
     End If
     
-    ' Loop through each URL
-    Dim i As Integer
+    Dim i As Long
     For i = startRow To lastRow
         Dim url As String
         url = ws.Cells(i, colNumber).Value
         
         If url <> "" Then
+            ' Navigate to the URL
             driver.Get url
-            Application.Wait Now + TimeValue("00:00:02") ' Wait for 2 seconds (adjust as needed)
             
-            ' Click the button (adjust the selector accordingly)
+            ' Wait for the page to load (adjust wait time as needed)
+            Application.Wait Now + TimeValue("00:00:05")
+            
+            ' Click the button (adjust the CSS selector as needed)
             On Error Resume Next
             driver.FindElementByCss("button.some-button-class").Click
             On Error GoTo 0
+            
+            ' Wait again for the action to complete and for the success text to appear
+            Application.Wait Now + TimeValue("00:00:05")
+            
+            ' Retrieve the text from the success element using XPath (adjust the XPath as needed)
+            Dim elementText As String
+            On Error Resume Next
+            elementText = driver.FindElementByXPath("//xpath/to/success-element").Text
+            On Error GoTo 0
+            
+            ' Check if the text matches "success saved" (case-insensitive)
+            If LCase(Trim(elementText)) = "success saved" Then
+                ws.Cells(i, colNumber + 1).Value = "success"
+            Else
+                ws.Cells(i, colNumber + 1).Value = "failure"
+            End If
         End If
     Next i
     
-    ' Close the driver
+    ' Clean up the Selenium driver
     driver.Quit
     Set driver = Nothing
+    
+    ' Save and close the workbook
+    wb.Save
+    wb.Close
     
     MsgBox "Process completed!", vbInformation
 End Sub
