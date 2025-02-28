@@ -1,0 +1,53 @@
+Sub NavigateAndClickButton()
+    Dim driver As New Selenium.ChromeDriver
+    Dim ws As Worksheet
+    Dim colLetter As String, colNumber As Integer
+    Dim startRow As Integer, lastRow As Integer
+    Dim userInput As String
+    
+    ' Set worksheet
+    Set ws = ActiveSheet
+    
+    ' Ask for the column letter
+    colLetter = InputBox("Enter the column letter containing URLs (e.g., A):")
+    If colLetter = "" Then Exit Sub
+    
+    ' Convert column letter to number
+    colNumber = Range(colLetter & "1").Column
+    
+    ' Ask for the start row
+    userInput = InputBox("Enter the start row (e.g., 2):")
+    If userInput = "" Then Exit Sub
+    startRow = CInt(userInput)
+    
+    ' Ask for the last row
+    userInput = InputBox("Enter the last row (leave blank to auto-detect last filled row):")
+    If userInput = "" Then
+        lastRow = ws.Cells(ws.Rows.Count, colNumber).End(xlUp).Row
+    Else
+        lastRow = CInt(userInput)
+    End If
+    
+    ' Loop through each URL
+    Dim i As Integer
+    For i = startRow To lastRow
+        Dim url As String
+        url = ws.Cells(i, colNumber).Value
+        
+        If url <> "" Then
+            driver.Get url
+            Application.Wait Now + TimeValue("00:00:02") ' Wait for 2 seconds (adjust as needed)
+            
+            ' Click the button (adjust the selector accordingly)
+            On Error Resume Next
+            driver.FindElementByCss("button.some-button-class").Click
+            On Error GoTo 0
+        End If
+    Next i
+    
+    ' Close the driver
+    driver.Quit
+    Set driver = Nothing
+    
+    MsgBox "Process completed!", vbInformation
+End Sub
