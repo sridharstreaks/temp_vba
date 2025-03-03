@@ -1,20 +1,27 @@
-Sub NavigateAndClickButton()
+Sub ProcessUrlsWithRetry()
     Dim driver As New Selenium.ChromeDriver
-    Dim wb As Workbook
-    Dim ws As Worksheet
-    Dim filePath As String
-    Dim colLetter As String, colNumber As Integer
-    Dim startRow As Long, lastRow As Long
+    Dim wb As Workbook, ws As Worksheet
+    Dim filePath As String, colLetter As String
+    Dim colNumber As Integer, startRow As Long, lastRow As Long
     Dim userInput As String
+    Dim staticConfirmation As String
+    Dim i As Long, retryCount As Integer
+    Dim url As String, cellText As String
+    Dim textArea As Object, saveButton As Object, infoElement As Object
+    Dim infoText As String
+    Dim attemptSuccess As Boolean
     
-    ' Prompt the user to select an Excel workbook (xlsx)
+    ' Set your static confirmation text
+    staticConfirmation = "success saved"
+    
+    ' Prompt user to select an Excel workbook (xlsx)
     filePath = Application.GetOpenFilename(FileFilter:="Excel Files (*.xlsx), *.xlsx", Title:="Select Excel Workbook")
-    If filePath = "False" Then Exit Sub ' User canceled the file dialog
+    If filePath = "False" Then Exit Sub ' User canceled
     
     Set wb = Workbooks.Open(filePath)
-    Set ws = wb.ActiveSheet ' Change if you need a specific sheet
+    Set ws = wb.ActiveSheet ' Modify if a specific sheet is required
     
-    ' Ask for the column letter that contains URLs
+    ' Ask for the column letter containing URLs
     colLetter = InputBox("Enter the column letter containing URLs (e.g., A):")
     If colLetter = "" Then Exit Sub
     colNumber = ws.Range(colLetter & "1").Column
@@ -32,48 +39,80 @@ Sub NavigateAndClickButton()
         lastRow = CLng(userInput)
     End If
     
-    Dim i As Long
     For i = startRow To lastRow
-        Dim url As String
         url = ws.Cells(i, colNumber).Value
         
         If url <> "" Then
-            ' Navigate to the URL
-            driver.Get url
+            ' Retry mechanism for loading the page and finding the text area
+            retryCount = 0
+            attemptSuccess = False
+            Do While retryCount < 3 And Not attemptSuccess
+                driver.Get url
+                Application.Wait Now + TimeValue("00:00:05") ' wait for page to load
+                
+                On Error Resume Next
+                Set textArea = driver.FindElementByXPath("//textarea[@name='form']")
+                On Error GoTo 0
+                
+                If textArea Is Nothing Then
+                    retryCount = retryCount + 1
+                    If retryCount < 3 Then
+                        Application.Wait Now + TimeValue("00:00:03") ' wait before retrying
+                    End If
+                Else
+                    attemptSuccess = True
+                End If
+            Loop
             
-            ' Wait for the page to load (adjust wait time as needed)
-            Application.Wait Now + TimeValue("00:00:05")
+            ' If after 3 attempts the text area is still not found, save and exit
+            If Not attemptSuccess Then
+                wb.Save
+                wb.Close
+                driver.Quit
+                Err.Raise vbObjectError + 513, , "Failed to load page or find text area for URL: " & url
+            End If
             
-            ' Click the button (adjust the CSS selector as needed)
+            ' Read the text from a specific cell (e.g., A1) which holds your JSON/text
+            cellText = wb.ActiveSheet.Range("A1").Value
+            
+            ' Clear any existing text and paste the cell text into the text area
+            textArea.Clear
+            textArea.SendKeys cellText
+            
+            ' Click the save button (adjust the XPath as needed)
             On Error Resume Next
-            driver.FindElementByCss("button.some-button-class").Click
+            Set saveButton = driver.FindElementByXPath("//button[@id='save']")
             On Error GoTo 0
             
-            ' Wait again for the action to complete and for the success text to appear
-            Application.Wait Now + TimeValue("00:00:05")
+            If Not saveButton Is Nothing Then
+                saveButton.Click
+            End If
             
-            ' Retrieve the text from the success element using XPath (adjust the XPath as needed)
-            Dim elementText As String
+            Application.Wait Now + TimeValue("00:00:05") ' Wait for page reload
+            
+            ' Locate the confirmation element on the new page using XPath
             On Error Resume Next
-            elementText = driver.FindElementByXPath("//xpath/to/success-element").Text
+            Set infoElement = driver.FindElementByXPath("//div[@id='info']")
             On Error GoTo 0
             
-            ' Check if the text matches "success saved" (case-insensitive)
-            If LCase(Trim(elementText)) = "success saved" Then
-                ws.Cells(i, colNumber + 1).Value = "success"
+            If Not infoElement Is Nothing Then
+                infoText = infoElement.Text
+                ' Compare the confirmation text with the static text (ignoring case and trimming spaces)
+                If LCase(Trim(infoText)) = LCase(staticConfirmation) Then
+                    ws.Cells(i, colNumber + 1).Value = "success"
+                Else
+                    ws.Cells(i, colNumber + 1).Value = "failure"
+                End If
             Else
-                ws.Cells(i, colNumber + 1).Value = "failure"
+                ws.Cells(i, colNumber + 1).Value = "failure (confirmation element not found)"
             End If
         End If
     Next i
     
-    ' Clean up the Selenium driver
+    ' Clean up and save
     driver.Quit
     Set driver = Nothing
-    
-    ' Save and close the workbook
     wb.Save
     wb.Close
-    
     MsgBox "Process completed!", vbInformation
 End Sub
