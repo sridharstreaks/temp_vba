@@ -5,7 +5,8 @@ Sub ExtractHrefFromURLs()
     Dim IE As Object, elem As Object
     Dim endRowInput As String
     Dim ws As Worksheet
-    
+    Dim startTime As Single
+
     ' Prompt for inputs
     wsName = InputBox("Enter the worksheet name containing the URLs:")
     colName = InputBox("Enter the column letter containing the URLs (e.g., A):")
@@ -24,27 +25,43 @@ Sub ExtractHrefFromURLs()
     
     ' Create and configure Internet Explorer instance
     Set IE = CreateObject("InternetExplorer.Application")
-    IE.Visible = False   ' Change to True if you wish to see the navigation
+    IE.Visible = False   ' Change to True if you want to see the navigation
     
     ' Loop through each URL in the specified range
     For i = startRow To endRow
         urlToProcess = ws.Cells(i, ws.Range(colName & "1").Column).Value
         If urlToProcess <> "" Then
             IE.Navigate urlToProcess
-            ' Wait for page to load completely
+            
+            ' Wait for IE to finish loading
             Do While IE.Busy Or IE.ReadyState <> 4
                 DoEvents
             Loop
             
+            ' Additionally, wait for the document readyState to be "complete"
             On Error Resume Next
-            ' Use querySelector to get the anchor inside h1.title
-            Set elem = IE.Document.querySelector("h1.title a")
+            Do While IE.Document.readyState <> "complete"
+                DoEvents
+            Loop
+            On Error GoTo 0
+            
+            ' Wait for the specific element to appear (timeout after 10 seconds)
+            startTime = Timer
+            Set elem = Nothing
+            Do
+                On Error Resume Next
+                Set elem = IE.Document.querySelector("h1.title a")
+                On Error GoTo 0
+                If Not elem Is Nothing Then Exit Do
+                If Timer - startTime > 10 Then Exit Do ' Timeout after 10 seconds
+                DoEvents
+            Loop
+            
             If Not elem Is Nothing Then
                 extractedHref = elem.href
             Else
                 extractedHref = "Not found"
             End If
-            On Error GoTo 0
             
             ' Write the extracted link in the cell immediately to the right of the URL cell
             ws.Cells(i, ws.Range(colName & "1").Column + 1).Value = extractedHref
