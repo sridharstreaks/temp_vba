@@ -1,105 +1,81 @@
 from openpyxl import load_workbook, Workbook
 
-def get_wildcard(text):
-    """
-    Returns the text before the last '-' in the string.
-    If no '-' is found, returns the full text.
-    """
-    if text is None:
-        return ""
-    return text.rsplit('-', 1)[0] if '-' in text else text
+MAX_ROWS_PER_SHEET = 1_000_000  # Set a safe limit (Excel limit is ~1,048,576)
 
-def read_column(ws, col_letter="A"):
+def write_pairs_to_multiple_sheets(wb, pairs, base_sheet_name="Output"):
     """
-    Reads all cell values from the specified column in the worksheet.
+    Writes the list of pairs to multiple sheets in the workbook.
+    Each sheet will have at most MAX_ROWS_PER_SHEET rows (excluding header).
     """
-    return [cell.value for cell in ws[col_letter] if cell.value is not None]
+    sheet_count = 1
+    current_sheet = wb.create_sheet(f"{base_sheet_name}_{sheet_count}")
+    current_sheet.append(["Value 1", "Value 2"])
+    row_count = 1  # header already written
 
-def group_values(values):
-    """
-    Groups consecutive values where each new value contains the wildcard from the first element
-    of the group. Only groups with 2 or more elements are returned.
-    """
+    for pair in pairs:
+        if row_count >= MAX_ROWS_PER_SHEET:
+            sheet_count += 1
+            current_sheet = wb.create_sheet(f"{base_sheet_name}_{sheet_count}")
+            current_sheet.append(["Value 1", "Value 2"])
+            row_count = 1
+        current_sheet.append(list(pair))
+        row_count += 1
+
+def main():
+    input_file = "input.xlsx"
+    wb = load_workbook(input_file)
+    ws = wb.active
+
+    # Read the column values from ws (assuming column A)
+    values = [cell.value for cell in ws["A"] if cell.value is not None]
+    
+    # Grouping logic (as defined previously)
     groups = []
     current_group = []
     current_wildcard = None
 
+    def get_wildcard(text):
+        return text.rsplit('-', 1)[0] if text and '-' in text else text
+
     for value in values:
-        # If starting a new group, calculate the wildcard from the current cell.
         if not current_group:
             current_group.append(value)
             current_wildcard = get_wildcard(value)
         else:
-            # If current value contains the wildcard from the first element, add it to the group.
             if current_wildcard in value:
                 current_group.append(value)
             else:
-                # Only groups with 2 or more cells are valid.
                 if len(current_group) >= 2:
                     groups.append(current_group)
-                # Reset the group with the current cell.
                 current_group = [value]
                 current_wildcard = get_wildcard(value)
-    # Check at the end of the loop.
     if len(current_group) >= 2:
         groups.append(current_group)
-    return groups
+    
+    # Revised pairing: create ordered pairs from each group
+    def create_pairs(group):
+        pairs = []
+        n = len(group)
+        for i in range(n):
+            for j in range(n):
+                if i != j:
+                    pairs.append((group[i], group[j]))
+        return pairs
 
-def create_pairs(group):
-    """
-    Given a list of values in a group, creates a list of tuples representing all
-    possible ordered pairs (crossmatch) within that group.
-    For example, for group = [A, B, C]:
-      returns [(A,B), (A,C), (B,A), (B,C), (C,A), (C,B)]
-    """
-    pairs = []
-    n = len(group)
-    for i in range(n):
-        for j in range(n):
-            if i != j:
-                pairs.append((group[i], group[j]))
-    return pairs
-
-def write_pairs_to_sheet(wb, pairs, sheet_name="Output"):
-    """
-    Writes the list of pairs to a new sheet in the workbook.
-    Each pair is written in two columns.
-    """
-    new_sheet = wb.create_sheet(sheet_name)
-    new_sheet.append(["Value 1", "Value 2"])
-    for pair in pairs:
-        new_sheet.append(list(pair))
-
-def main():
-    # Specify your input file name
-    input_file = "input.xlsx"
-    
-    # Load workbook and select the active sheet (adjust if needed)
-    wb = load_workbook(input_file)
-    ws = wb.active
-    
-    # Read column A (change letter if needed)
-    values = read_column(ws, col_letter="A")
-    print("Read values:", values)
-    
-    # Group values based on wildcard logic
-    groups = group_values(values)
-    print("Found groups:", groups)
-    
-    # Create all pairwise combinations from groups
     all_pairs = []
     for group in groups:
-        group_pairs = create_pairs(group)
-        all_pairs.extend(group_pairs)
+        all_pairs.extend(create_pairs(group))
+
+    # Create a new workbook to write output
+    out_wb = Workbook()
+    # Remove the default sheet created by Workbook
+    default_sheet = out_wb.active
+    out_wb.remove(default_sheet)
     
-    print("Total pairs created:", len(all_pairs))
+    write_pairs_to_multiple_sheets(out_wb, all_pairs, base_sheet_name="Output")
     
-    # Write the pairs to a new sheet in the workbook
-    write_pairs_to_sheet(wb, all_pairs, sheet_name="Output")
-    
-    # Save the workbook (change the output file name if desired)
-    output_file = "output.xlsx"
-    wb.save(output_file)
+    output_file = "output_multiple_sheets.xlsx"
+    out_wb.save(output_file)
     print(f"Output written to {output_file}")
 
 if __name__ == "__main__":
