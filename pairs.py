@@ -18,3 +18,15 @@ column_name = 'Status'  # Change this to your target column
 values_to_remove = ['Inactive', 'Pending']  # List of values to filter out
 
 filter_and_delete_rows(input_file, output_file, column_name, values_to_remove)
+
+
+awk '
+  /<value>/ {
+    gsub(/.*<value>|<\/value>.*/,"")    # strip tags
+    vals = vals "\"" $0 "\","         # accumulate quoted values
+  }
+  END {
+    sub(/,$/,"",vals)                  # remove last comma
+    print vals
+  }
+' input.txt
