@@ -1,47 +1,42 @@
 import os
 import sys
-import glob
-to_datetime = None
+glob
 from datetime import datetime, timedelta
-import openpyxl
+import pandas as pd
 
 def get_recent_files(folder, minutes=5):
     now = datetime.now()
-    pattern = os.path.join(folder, '*.xlsx')
+    pattern = os.path.join(folder, '*.csv')
     files = glob.glob(pattern)
-    recent = []
-    for f in files:
-        modified = datetime.fromtimestamp(os.path.getmtime(f))
-        if now - modified <= timedelta(minutes=minutes):
-            recent.append(f)
-    return recent
+    return [f for f in files if now - datetime.fromtimestamp(os.path.getmtime(f)) <= timedelta(minutes=minutes)]
+
 
 def process_files(folder):
     files = get_recent_files(folder)
     if len(files) != 2:
-        raise Exception(f"Expected exactly 2 files updated in the last 5 minutes, found {len(files)}.")
-    # Sort for consistency
+        raise Exception(f"Expected exactly 2 CSV files updated in the last 5 minutes, found {len(files)}.")
     files.sort()
     first_file = files[0]
-    wb = openpyxl.load_workbook(first_file)
-    ws = wb.active
-    # Insert new column A
-    ws.insert_cols(1)
-    # Set header
-    ws['A1'] = 'Segment'
-    # Determine the last row with data in existing columns (after insert -> original B...)
-    max_row = ws.max_row
-    for row in range(2, max_row + 1):
-        # Only fill where other columns have data
-        if any(ws.cell(row=row, column=col).value is not None for col in range(2, ws.max_column + 1)):
-            ws.cell(row=row, column=1).value = 'yes'
-    # Save and close
-    wb.save(first_file)
+
+    # Read CSV into DataFrame
+    df = pd.read_csv(first_file)
+
+    # Insert new column 'Segment' at position 0
+    df.insert(0, 'Segment', '')
+
+    # Fill header and segment values
+    df.at[0, 'Segment'] = 'Segment'
+    # Identify rows that have any data in other columns
+    mask = df.iloc[:, 1:].notna().any(axis=1)
+    df.loc[mask, 'Segment'] = 'yes'
+
+    # Save back to CSV
+    df.to_csv(first_file, index=False)
+
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print("Usage: python script.py <folder_path>")
         sys.exit(1)
-    folder = sys.argv[1]
-    process_files(folder)
-    print("Processing completed.")
+    process_files(sys.argv[1])
+    print("CSV processing completed.")
