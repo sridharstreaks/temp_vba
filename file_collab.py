@@ -19,6 +19,12 @@ def extract_stats_and_series(df, col_idx):
         raise ValueError(f"Expected 29 values in rows 7–35, got {len(series)}")
     return [min_, avg_, max_] + series
 
+def get_dynamic_headers(df):
+    labels = df.iloc[6:35, 0].tolist()  # Column A, rows 7-35
+    if len(labels) != 29:
+        raise ValueError("Expected 29 labels in Column A (rows 7–35)")
+    return labels
+
 def process_name(folder, name):
     """
     For a given base name (without .csv or _capacity.csv), return three rows of data.
