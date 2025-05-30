@@ -30,3 +30,25 @@ Sub ExampleUsage()
     result = RemoveCharsAfterHyphen(myString)
     Debug.Print result ' Output: Just some text (no hyphen found)
 End Sub
+
+Sub DictionaryIndexExample()
+
+    Dim dict As Object
+    Set dict = CreateObject("Scripting.Dictionary")
+
+    ' Add some items to the dictionary
+    dict.Add "Key1", "Value1"
+    dict.Add "Key2", "Value2"
+    dict.Add "Key3", "Value3"
+
+    ' Accessing items using their index (0-based)
+    Debug.Print "Item at index 0: " & dict.Item(dict.Keys(0)) 'prints Value1
+    Debug.Print "Item at index 1: " & dict.Item(dict.Keys(1)) 'prints Value2
+    Debug.Print "Item at index 2: " & dict.Item(dict.Keys(2)) 'prints Value3
+
+    ' Accessing keys and values in a loop
+    For i = 0 To dict.Count - 1
+        Debug.Print "Key: " & dict.Keys(i) & ", Value: " & dict.Items(i)
+    Next i
+
+End Sub
