@@ -1,53 +1,45 @@
-Sub InsertRowsEveryNAndCopyValues(startRow As Long, interval As Long)
-    Dim ws As Worksheet
-    Dim lastRow As Long
-    Dim k As Long
-    Dim maxK As Long
-    Dim insertAt As Long
-    Dim totalRows As Long
-    Const SHEET_NAME As String = "Sheet1"
-
-    On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(SHEET_NAME)
-    On Error GoTo 0
+Sub PasteXlookupFormulasInInsertedRows()
+    Dim ws         As Worksheet
+    Dim lookupWS   As Worksheet
+    Dim lastRow    As Long
+    Dim lastCol    As Long
+    Dim r          As Long
+    Dim c          As Long
+    Dim matchAE    As Boolean
     
-    If ws Is Nothing Then
-        MsgBox "Worksheet '" & SHEET_NAME & "' not found.", vbExclamation
-        Exit Sub
-    End If
-
-    If ws.ProtectContents Or ws.ProtectDrawingObjects Or ws.ProtectScenarios Then
-        MsgBox "Worksheet '" & SHEET_NAME & "' is protected. Unprotect it first.", vbExclamation
-        Exit Sub
-    End If
-
-    totalRows = ws.Rows.Count
-    lastRow = ws.Cells(totalRows, "A").End(xlUp).Row
-
-    If startRow > lastRow Then
-        MsgBox "startRow (" & startRow & ") is below any used data (lastRow = " & lastRow & ").", vbInformation
-        Exit Sub
-    End If
-
-    maxK = Int((lastRow - startRow) / interval)
-
-    For k = maxK To 0 Step -1
-        insertAt = startRow + (k * interval)
+    '──— Change these sheet names as needed ──—
+    Set ws = ThisWorkbook.Worksheets("Sheet1")   ' sheet where rows were inserted
+    Set lookupWS = ThisWorkbook.Worksheets("Sheet2")  ' sheet that holds columns A, C, E for XLOOKUP
+    
+    ' Find the last used row in column A of ws:
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    ' Find the last filled column in row 1 of ws:
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    
+    ' Loop from row 1 down to the second-to-last row:
+    ' If in ws, A:E of row r = A:E of row r+1, then r is one of our “inserted” rows.
+    For r = 1 To lastRow - 1
+        matchAE = _
+            (ws.Cells(r, "A").Value = ws.Cells(r + 1, "A").Value) And _
+            (ws.Cells(r, "B").Value = ws.Cells(r + 1, "B").Value) And _
+            (ws.Cells(r, "C").Value = ws.Cells(r + 1, "C").Value) And _
+            (ws.Cells(r, "D").Value = ws.Cells(r + 1, "D").Value) And _
+            (ws.Cells(r, "E").Value = ws.Cells(r + 1, "E").Value)
         
-        If insertAt >= 1 And insertAt < totalRows Then
-            On Error Resume Next
-            ws.Rows(insertAt).Insert Shift:=xlDown
-            If Err.Number = 0 Then
-                ' Copy values from the row below into the inserted row (columns A to E)
-                ws.Range("A" & insertAt + 1 & ":E" & insertAt + 1).Copy
-                ws.Range("A" & insertAt).PasteSpecial Paste:=xlPasteValues
-            Else
-                MsgBox "Error inserting at row " & insertAt & ": " & Err.Description, vbExclamation
-                Err.Clear
-            End If
-            On Error GoTo 0
+        If matchAE Then
+            ' r is an inserted row.  Paste the XLOOKUP formula from col F to lastCol:
+            For c = 6 To lastCol
+                ' Using R1C1 style so that:
+                '   • RC3   → column C of THIS (inserted) row (e.g. C2 if r=2)
+                '   • R1C   → row 1 of THIS column (e.g. F1, G1, etc.)
+                ' Whole‐column references to lookupWS:
+                '   `'Sheet2'!C:C`, `'Sheet2'!A:A`, `'Sheet2'!E:E`
+                ws.Cells(r, c).FormulaR1C1 = _
+                    "=XLOOKUP(1," & _
+                        "('" & lookupWS.Name & "'!C:C=RC3)*(" & _
+                        "'" & lookupWS.Name & "'!A:A=R1C)" & _
+                    ",'" & lookupWS.Name & "'!E:E)"
+            Next c
         End If
-    Next k
-
-    Application.CutCopyMode = False
+    Next r
 End Sub
