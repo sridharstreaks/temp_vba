@@ -1,81 +1,52 @@
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
-def insert_and_fill(
-    path: str,
-    sheet_name: str,
-    start_row: int,
-    interval: int,
-    lookup_sheet_name: str = None
+def insert_and_fill_values(
+    path, sheet_name, start_row, interval, lookup_sheet_name=None
 ):
-    # 1) Load workbook
     wb = load_workbook(path)
     ws = wb[sheet_name]
     
-    # 2) Determine lookup sheet
+    # 1) pick lookup sheet
     if lookup_sheet_name:
         ws_lookup = wb[lookup_sheet_name]
     else:
         idx = wb.sheetnames.index(sheet_name)
         ws_lookup = wb[wb.sheetnames[idx + 1]]
     
-    # 3) Find last used row by looking at column A
-    last_row = max(
-        cell.row for cell in ws['A'] 
-        if cell.value is not None
-    )
-    # 4) Find last header column in row 1
-    last_col = max(cell.column for cell in ws[1] if cell.value is not None)
+    # 2) build lookup dict: key = str(C)+str(A), value = E
+    lookup = {}
+    for row in ws_lookup.iter_rows(min_row=1,
+                                   max_col=5,
+                                   values_only=True):
+        a, _, c, _, e = row[:5]   # row = (A, B, C, D, E)
+        if a is not None and c is not None:
+            lookup[str(c) + str(a)] = e
     
-    # 5) Compute insertion points
-    max_k = (last_row - start_row) // interval
-    insert_points = [
-        start_row + k * interval
-        for k in range(max_k + 1)
-        if start_row + k * interval <= last_row
-    ]
-    # reverse so earlier inserts don't shift the later ones
-    for r in reversed(insert_points):
-        # insert blank row
+    # 3) find last row & last column in main sheet
+    last_row = max(c.row for c in ws['A'] if c.value is not None)
+    last_col = max(c.column for c in ws[1]  if c.value is not None)
+    
+    # 4) compute insertion points
+    pts = [start_row + k * interval
+           for k in range((last_row - start_row)//interval + 1)
+           if start_row + k * interval <= last_row]
+    
+    # 5) do insert→copy→fill entirely in Python
+    for r in reversed(pts):
         ws.insert_rows(r)
-        
-        # copy A:D from row r+1 → row r
-        for col in range(1, 5):  # 1=A ... 4=D
-            ws.cell(r, col).value = ws.cell(r + 1, col).value
-        
-        # set E to "blah"
+        # copy A:D from r+1 → r
+        for col in range(1, 5):
+            ws.cell(r, col).value = ws.cell(r+1, col).value
+        # E = "blah"
         ws.cell(r, 5).value = "blah"
+        # F–H left alone
         
-        # leave F-H alone
-        
-        # paste XLOOKUP formula in cols I (=9) → last_col
-        for col in range(9, last_col + 1):
-            header_addr = f"{get_column_letter(col)}$1"
-            # formula references: C<r> and header in row 1
-            c_ref       = f"C{r}"
-            lookup_name = ws_lookup.title
-            # wrap sheet name in single-quotes if needed
-            if ' ' in lookup_name:
-                lookup_name = f"'{lookup_name}'"
-            # build formula
-            formula = (
-                f"=XLOOKUP(1,"
-                f"({lookup_name}!C:C={c_ref})*"
-                f"({lookup_name}!A:A={header_addr}),"
-                f"{lookup_name}!E:E,"
-                f"\"\",0)"
-            )
-            ws.cell(r, col).value = formula
-
-    # 6) Save
+        # now fill I→last_col by looking up C & header
+        c_val = ws.cell(r, 3).value            # C<r>
+        for col in range(9, last_col+1):       # 9 = column I
+            hdr = ws.cell(1, col).value        # I1, J1, …
+            key = str(c_val) + str(hdr)
+            ws.cell(r, col).value = lookup.get(key, "")
+    
     wb.save(path)
-
-
-if __name__ == "__main__":
-    insert_and_fill(
-        path="C:/path/to/your_workbook.xlsx",
-        sheet_name="Sheet1",
-        start_row=2,
-        interval=3,
-        # optionally: lookup_sheet_name="LookupData"
-    )
