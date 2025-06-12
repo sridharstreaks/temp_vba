@@ -1,4 +1,8 @@
-grep -zoP '<util:set id="some_word"[^>]*>.*?</util:set>' file.xml \
-  | grep -oP '<value>\K[^<]+' \
-  | sed 's/.*/"&"/' \
-  | paste -sd, -
+awk '
+  /<util:set id="some_word"/ { in=1 }
+  in && /<value>/ {
+    gsub(/.*<value>|<\/value>.*/, "", $0)
+    printf "\"%s\",", $0
+  }
+  /<\/util:set>/ { in=0 }
+' file.xml | sed 's/,$//'
