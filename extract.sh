@@ -1,21 +1,26 @@
 word=$(
   awk '
-    # When we hit the opening tag, turn our flag on
-    /<util:set[[:space:]]+id="some_word"/ { in_block = 1; next }
-
-    # When we hit the closing tag, turn it off
-    /<\/util:set>/            { in_block = 0; next }
-
-    # Only inside that block, grab <value> lines
-    in_block && /<value>/ {
-      # strip the tags, leaving just the inner text
-      gsub(/.*<value>|<\/value>.*/, "")
-      # accumulate into vals with quotes+comma
-      vals = vals "\"" $0 "\","
+    BEGIN {
+      in_block = 0
+      vals     = ""
     }
-
+    # 1) opening-tag: must be a <util:set> with id="some_word" anywhere in it
+    /<util:set[^>]*id="some_word"[^>]*>/ {
+      in_block = 1
+      next
+    }
+    # 2) closing-tag: turn it off when you see </util:set>
+    /<\/util:set[[:space:]]*>/ {
+      in_block = 0
+      next
+    }
+    # 3) only inside that block, grab <value>…</value>
+    in_block {
+      if ( match($0, /<value>([^<]+)<\/value>/, m) ) {
+        vals = vals "\"" m[1] "\","
+      }
+    }
     END {
-      # drop trailing comma and print
       sub(/,$/, "", vals)
       print vals
     }
