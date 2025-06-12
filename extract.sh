@@ -1,16 +1,23 @@
-awk '
-  /<util:set[[:space:]]+id="some_word"/ { in_block=1; next }
-  /<\/util:set>/          { in_block=0 }
-  in_block && /<value>/  {
-    # extract just the text between <value>…</value>
-    if ( match($0, /<value>([^<]+)<\/value>/, m) ) {
-      printf "\"%s\",", m[1]
+word=$(
+  awk '
+    # When we hit the opening tag, turn our flag on
+    /<util:set[[:space:]]+id="some_word"/ { in_block = 1; next }
+
+    # When we hit the closing tag, turn it off
+    /<\/util:set>/            { in_block = 0; next }
+
+    # Only inside that block, grab <value> lines
+    in_block && /<value>/ {
+      # strip the tags, leaving just the inner text
+      gsub(/.*<value>|<\/value>.*/, "")
+      # accumulate into vals with quotes+comma
+      vals = vals "\"" $0 "\","
     }
-  }
-  END {
-    # strip trailing comma and add newline
-    sub(/,$/, "", out = "")
-    # but since we printed directly, re-print everything from stdout
-    # instead, you can pipe through sed as shown below
-  }
-' file.xml | sed 's/,$//'
+
+    END {
+      # drop trailing comma and print
+      sub(/,$/, "", vals)
+      print vals
+    }
+  ' "$file"
+)
