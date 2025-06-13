@@ -1,15 +1,8 @@
-awk -v id="some_word" '
-  # once we see <util:set … id="some_word" …>  up to </util:set>...
-  $0 ~ "<util:set[^>]*id=\"" id "\"[^>]*>" , $0 ~ "</util:set>" {
-    # if this line has a <value>…</value>, capture it
-    if (match($0, /<value>([^<]+)<\/value>/, m)) {
-      # print "value", and a comma
-      printf "\"%s\",", m[1]
-    }
+awk '
+  /<util:set[^>]*id="format_words"/ { inblock=1 }
+  inblock && /<value>/ {
+    gsub(/.*<value>|<\/value>.*/, "", $0)
+    printf "\"%s\",", $0
   }
-  END {
-    # strip trailing comma & print newline
-    sub(/,$/, "")
-    print ""
-  }
+  /<\/util:set>/ && inblock { inblock=0; print "" }
 ' input.xml
